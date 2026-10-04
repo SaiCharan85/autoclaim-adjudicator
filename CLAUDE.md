@@ -103,13 +103,15 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 | Setup | `uv sync` then `uv run pre-commit install` |
 | Lint | `uv run ruff check . && uv run ruff format --check .` |
 | Type check | `uv run mypy` |
-| Test | `uv run pytest` |
+| Test | `uv run pytest` (real-data tests auto-skip if `data/` is absent) |
+| Download data | `uv run python scripts/download_data.py` (needs `KAGGLE_API_TOKEN` in `.env`) |
+| Profile data | `uv run python scripts/profile_data.py` → `docs/data_profile.md` |
 | Run demo | _TBD (Step 9)_ |
 | Run eval | _TBD (Step 8)_ |
 
 ## 9. Step plan
 - ☑ Step 0 — Foundations (CLAUDE.md, pyproject, skeleton, CI, DATA.md, README stub)
-- ☐ Step 1 — Data layer (Kaggle download, schemas, profile → `docs/data_notes.md`)
+- ☑ Step 1 — Data layer (Kaggle download, schemas, profile → `docs/data_notes.md`)
 - ☐ Step 2 — Fraud ML (5-model benchmark, CatBoost + SHAP, Isolation Forest, rules, model card)
 - ☐ Step 3 — Policy & retrieval (policy YAML, NetworkX graph, BM25 + HNSW + RRF, k-hop, benchmark doc)
 - ☐ Step 4 — Synthetic claims (row-conditioned, red flags, 6 traps, messiness; pilot 50 → full 300–500)

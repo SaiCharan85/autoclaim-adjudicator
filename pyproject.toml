@@ -11,6 +11,8 @@ dependencies = [
     "pydantic>=2.7",
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
+    "pandas>=2.2",
+    "kaggle>=1.7",
 ]
 
 [dependency-groups]
@@ -20,6 +22,7 @@ dev = [
     "mypy>=1.11",
     "pre-commit>=3.8",
     "types-pyyaml>=6.0",
+    "pandas-stubs>=3.0.5.260914",
 ]
 
 [build-system]
@@ -48,6 +51,7 @@ addopts = "-ra --strict-markers"
 markers = [
     "slow: long-running tests (deselect with -m 'not slow')",
     "live_llm: hits a real LLM API; never run in CI",
+    "requires_data: needs downloaded data in data/; auto-skipped when absent",
 ]
 
 # ---------------------------------------------------------------- mypy
@@ -55,6 +59,10 @@ markers = [
 python_version = "3.11"
 strict = true
 files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["kaggle.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["scripts.*", "eval.*", "tests.*"]

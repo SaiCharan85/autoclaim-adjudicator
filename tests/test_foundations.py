@@ -81,7 +81,7 @@ def _env_example(repo_root: Path) -> dict[str, str]:
 
 def test_env_example_lists_expected_variables(repo_root: Path) -> None:
     keys = set(_env_example(repo_root))
-    assert {"KAGGLE_USERNAME", "KAGGLE_KEY"} <= keys
+    assert {"KAGGLE_API_TOKEN", "KAGGLE_USERNAME", "KAGGLE_KEY"} <= keys
 
 
 def test_env_example_secret_values_are_blank(repo_root: Path) -> None:
