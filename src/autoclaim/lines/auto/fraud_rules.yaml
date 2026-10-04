@@ -1,0 +1,62 @@
+# Auto physical-damage fraud red flags, written in our own words from general industry knowledge.
+# No third-party publication text is reproduced here.
+#
+# A red flag is a reason to look closer, never proof of fraud. Weights are our own judgment of
+# how strongly each flag should raise attention; they are combined with a noisy-OR in [0, 1].
+# Fields use the tabular feature names, so the same rules run on Kaggle rows and synthetic claims.
+# Narrative-only flags (vague or shifting story, pressure for fast payment) are added in Step 4/5,
+# once intake extracts those facts.
+
+name: auto_physical_damage_red_flags
+version: "1.0"
+rules:
+  - id: loss_soon_after_inception
+    description: The loss happened within about two weeks of the policy starting.
+    weight: 0.35
+    all_of:
+      - {field: Days_Policy_Accident, op: in, value: ["none", "1 to 7", "8 to 15"]}
+
+  - id: claim_soon_after_inception
+    description: The claim was filed within about two weeks of the policy starting.
+    weight: 0.30
+    all_of:
+      - {field: Days_Policy_Claim, op: in, value: ["none", "1 to 7", "8 to 15"]}
+
+  - id: recent_address_change
+    description: The policyholder changed address within six months before the claim.
+    weight: 0.35
+    all_of:
+      - {field: AddressChange_Claim, op: eq, value: "under 6 months"}
+
+  - id: unverified_at_fault_loss
+    description: >-
+      The policyholder was at fault and nothing independent backs up the story:
+      no police report and no witness.
+    weight: 0.10
+    all_of:
+      - {field: Fault, op: eq, value: "Policy Holder"}
+      - {field: PoliceReportFiled, op: eq, value: "No"}
+      - {field: WitnessPresent, op: eq, value: "No"}
+
+  - id: isolated_unverified_loss
+    description: The loss happened in a rural area with no police report and no witness.
+    weight: 0.15
+    all_of:
+      - {field: AccidentArea, op: eq, value: "Rural"}
+      - {field: PoliceReportFiled, op: eq, value: "No"}
+      - {field: WitnessPresent, op: eq, value: "No"}
+
+  - id: expensive_older_vehicle
+    description: >-
+      A high-priced vehicle that is several years old, where the payout could exceed what
+      the car is really worth.
+    weight: 0.15
+    all_of:
+      - {field: VehiclePrice, op: eq, value: "more than 69000"}
+      - {field: AgeOfVehicle, op: in, value: ["6 years", "7 years", "more than 7"]}
+
+  - id: delayed_reporting
+    description: The claim was reported roughly a month or more after the loss.
+    weight: 0.20
+    all_of:
+      - {field: claim_lag_weeks, op: ge, value: 4}

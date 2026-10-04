@@ -12,3 +12,7 @@ def data_dir() -> Path:
 
 def raw_dir(source_key: str) -> Path:
     return data_dir() / "raw" / source_key
+
+
+def models_dir() -> Path:
+    return Path(os.environ.get("AUTOCLAIM_MODELS_DIR", REPO_ROOT / "models"))

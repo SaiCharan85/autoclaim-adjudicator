@@ -13,6 +13,11 @@ dependencies = [
     "python-dotenv>=1.0",
     "pandas>=2.2",
     "kaggle>=1.7",
+    "scikit-learn>=1.5",
+    "catboost>=1.2",
+    "lightgbm>=4.3",
+    "xgboost>=2.0",
+    "interpret-core>=0.6",
 ]
 
 [dependency-groups]
@@ -61,7 +66,7 @@ strict = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["kaggle.*"]
+module = ["kaggle.*", "sklearn.*", "catboost.*", "joblib.*", "lightgbm.*", "xgboost.*", "interpret.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

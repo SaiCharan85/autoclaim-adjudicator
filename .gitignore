@@ -12,6 +12,7 @@ models/
 checkpoints/
 *.sqlite
 *.db
+catboost_info/
 
 # --- Python ---
 __pycache__/

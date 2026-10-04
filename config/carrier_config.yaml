@@ -16,6 +16,16 @@ harness:
   max_retries: 2          # critic/judge -> adjudicator retry loop
   seed: 42
 
+# Step 2: fraud model. Production model is trained on train_years only, so synthetic eval claims
+# generated from test_years rows never leak into the fraud score.
+fraud_model:
+  train_years: [1994, 1995]
+  test_years: [1996]
+  review_budget: 0.05     # share of claims the fraud team (SIU) can review; recall is measured at this cut
+  cv_folds: 5
+  # Excluded from the production model (several US states restrict their use); ablation only.
+  sensitive_features: [Sex, MaritalStatus]
+
 # Step 3: deductibles per coverage (collision vs. comprehensive)
 deductibles: {}
 
