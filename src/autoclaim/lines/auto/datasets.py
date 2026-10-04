@@ -15,6 +15,7 @@ from autoclaim.lines.auto.simulator.columns import assert_fnol_only
 from autoclaim.ml import features as legacy
 from autoclaim.ml.frame import AMOUNT, T, Y
 from autoclaim.ml.spec import DatasetSpec, Frames
+from autoclaim.ml.stages import ExpectedAmountStage
 
 EPOCH = pd.Timestamp("1970-01-01")
 
@@ -89,6 +90,17 @@ def split_by_date(split: DatasetSplit) -> Callable[[pd.DataFrame], Frames]:
         )
 
     return _split
+
+
+# What a repair usually costs depends on these first-notice facts (not on who is claiming).
+REPAIR_COST_INPUTS = (
+    "cause", "damage_extent", "towed", "vehicle_acv", "body_class", "vehicle_age",
+    "n_vehicles", "injury_count", "adas", "vehicle_role",
+)  # fmt: skip
+
+
+def repair_cost_stage(seed: int) -> ExpectedAmountStage:
+    return ExpectedAmountStage(REPAIR_COST_INPUTS, amount_col="claimed_amount", seed=seed)
 
 
 def _sim_holdouts() -> dict[str, pd.DataFrame]:
@@ -180,6 +192,7 @@ def get_spec(name: str, cfg: FraudModelConfig) -> DatasetSpec:
             sensitive=tuple(split.sensitive_features),
             check_features=assert_fnol_only,
             load_holdouts=_sim_holdouts,
+            stage_factories={"repair_cost": repair_cost_stage},
         )
     if name == "legacy_1990s":
         return DatasetSpec(

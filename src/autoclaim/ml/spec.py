@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 import pandas as pd
 
@@ -29,3 +30,5 @@ class DatasetSpec:
     sensitive: tuple[str, ...] = ()
     check_features: Callable[[Sequence[str]], None] = _no_check
     load_holdouts: Callable[[], dict[str, pd.DataFrame]] | None = field(default=None)
+    # name -> factory(seed) for fitted feature stages this dataset can use (ml/stages.py)
+    stage_factories: dict[str, Callable[[int], Any]] = field(default_factory=dict)

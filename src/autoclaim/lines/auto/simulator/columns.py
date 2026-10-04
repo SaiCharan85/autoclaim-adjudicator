@@ -29,6 +29,8 @@ _FNOL = (
     # derived at cleaning time from FNOL columns only
     "days_policy_to_loss", "days_policy_to_claim", "claim_to_acv", "loss_month", "loss_dow",
     "out_of_state",
+    # fitted feature stages (ml/stages.py), computed from FNOL columns only
+    "expected_log_amount", "amount_residual",
 )  # fmt: skip
 
 AVAILABILITY: dict[str, Availability] = {

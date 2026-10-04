@@ -12,7 +12,8 @@ import pandas as pd
 Y = "y"
 T = "t"
 AMOUNT = "amount"
-RESERVED = (Y, T, AMOUNT)
+WEIGHT = "w"  # optional per-row training weight
+RESERVED = (Y, T, AMOUNT, WEIGHT)
 
 
 def feature_list(frame: pd.DataFrame, exclude: Sequence[str] = ()) -> list[str]:

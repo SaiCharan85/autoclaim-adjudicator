@@ -27,7 +27,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from autoclaim.ml.frame import CategoryVocab, Y, categorical_columns, for_catboost
+from autoclaim.ml.frame import WEIGHT, CategoryVocab, Y, categorical_columns, for_catboost
 
 EARLY_STOPPING_ROUNDS = 100
 MAX_TREES = 2000
@@ -40,10 +40,23 @@ class _Base:
     name = "base"
     needs_val = False
 
-    def __init__(self, features: Sequence[str], seed: int) -> None:
+    supports_weights = False
+
+    def __init__(
+        self, features: Sequence[str], seed: int, params: dict[str, Any] | None = None
+    ) -> None:
         self.features = list(features)
         self.seed = seed
+        self.params = dict(params or {})
         self.cats: list[str] = []
+
+    def _weights(self, frame: pd.DataFrame) -> np.ndarray | None:
+        """Per-row training weights from the optional `w` column (None = unweighted)."""
+        if WEIGHT not in frame:
+            return None
+        if not self.supports_weights:
+            raise NotImplementedError(f"{self.name} does not support sample weights")
+        return frame[WEIGHT].to_numpy(dtype=float)
 
     def _learn_types(self, train: pd.DataFrame) -> None:
         self.cats = categorical_columns(train, self.features)
@@ -63,12 +76,13 @@ class _Base:
 class CatBoostModel(_Base):
     name = "catboost"
     needs_val = True
+    supports_weights = True
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "CatBoostModel":
         self._learn_types(train)
         self.model = CatBoostClassifier(
             iterations=MAX_TREES,
-            **CATBOOST_PARAMS,
+            **(CATBOOST_PARAMS | self.params),
             eval_metric="AUC",
             random_seed=self.seed,
             verbose=0,
@@ -81,6 +95,7 @@ class CatBoostModel(_Base):
         self.model.fit(
             for_catboost(train, self.features, self.cats),
             train[Y],
+            sample_weight=self._weights(train),
             cat_features=self.cats,
             eval_set=eval_set,
             early_stopping_rounds=EARLY_STOPPING_ROUNDS if val is not None else None,
@@ -100,6 +115,7 @@ class CatBoostModel(_Base):
 class LightGBMModel(_Base):
     name = "lightgbm"
     needs_val = True
+    supports_weights = True
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "LightGBMModel":
         self._learn_types(train)
@@ -122,7 +138,12 @@ class LightGBMModel(_Base):
                 "eval_set": [(self.vocab.transform(val, self.features), val[Y])],
                 "callbacks": [lgb.early_stopping(EARLY_STOPPING_ROUNDS, verbose=False)],
             }
-        self.model.fit(self.vocab.transform(train, self.features), train[Y], **kwargs)
+        self.model.fit(
+            self.vocab.transform(train, self.features),
+            train[Y],
+            sample_weight=self._weights(train),
+            **kwargs,
+        )
         return self
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
@@ -138,6 +159,7 @@ class LightGBMModel(_Base):
 class XGBoostModel(_Base):
     name = "xgboost"
     needs_val = True
+    supports_weights = True
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "XGBoostModel":
         self._learn_types(train)
@@ -158,7 +180,11 @@ class XGBoostModel(_Base):
         if val is not None:
             eval_set = [(self.vocab.transform(val, self.features), val[Y])]
         self.model.fit(
-            self.vocab.transform(train, self.features), train[Y], eval_set=eval_set, verbose=False
+            self.vocab.transform(train, self.features),
+            train[Y],
+            sample_weight=self._weights(train),
+            eval_set=eval_set,
+            verbose=False,
         )
         return self
 
@@ -176,6 +202,7 @@ class LogisticModel(_Base):
     name = "logistic"
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "LogisticModel":
+        self._weights(train)  # refuses weights explicitly rather than silently ignoring them
         self._learn_types(train)
         numeric = [c for c in self.features if c not in self.cats]
         pre = ColumnTransformer(
@@ -218,6 +245,7 @@ class EBMModel(_Base):
     name = "ebm"
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "EBMModel":
+        self._weights(train)  # refuses weights explicitly rather than silently ignoring them
         self._learn_types(train)
         types = ["nominal" if c in self.cats else "continuous" for c in self.features]
         self.model = ExplainableBoostingClassifier(
@@ -232,7 +260,7 @@ class EBMModel(_Base):
         return proba
 
 
-ModelFactory = Callable[[Sequence[str], int], _Base]
+ModelFactory = Callable[..., _Base]
 
 MODELS: dict[str, ModelFactory] = {
     "logistic": LogisticModel,
@@ -243,7 +271,9 @@ MODELS: dict[str, ModelFactory] = {
 }
 
 
-def make_model(name: str, features: Sequence[str], seed: int) -> _Base:
+def make_model(
+    name: str, features: Sequence[str], seed: int, params: dict[str, Any] | None = None
+) -> _Base:
     if name not in MODELS:
         raise KeyError(f"unknown model {name!r}; choose from {sorted(MODELS)}")
-    return MODELS[name](features, seed)
+    return MODELS[name](features, seed, params)
