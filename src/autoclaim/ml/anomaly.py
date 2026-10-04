@@ -16,7 +16,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from autoclaim.ml.features import categorical_columns
+from autoclaim.ml.frame import categorical_columns
 
 
 class FrequencyEncoder(BaseEstimator, TransformerMixin):  # type: ignore[misc]
@@ -56,13 +56,20 @@ class AnomalyScorer:
         self.features = list(features)
         self.seed = seed
         self.n_estimators = n_estimators
+        self.cats: list[str] = []
 
     def _frame(self, df: pd.DataFrame) -> pd.DataFrame:
-        cats = categorical_columns(self.features)
-        return df[self.features].astype({c: "object" for c in cats})
+        out = df[self.features].copy()
+        for c in self.features:
+            if c in self.cats:
+                out[c] = out[c].astype("object")
+            else:
+                out[c] = pd.to_numeric(out[c], errors="coerce").astype("float64")
+        return out
 
     def fit(self, train: pd.DataFrame) -> "AnomalyScorer":
-        cats = categorical_columns(self.features)
+        self.cats = categorical_columns(train, self.features)
+        cats = self.cats
         numeric = [c for c in self.features if c not in cats]
         pre = ColumnTransformer(
             [

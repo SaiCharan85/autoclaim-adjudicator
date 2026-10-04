@@ -67,26 +67,3 @@ def test_feature_columns_drop_ids_target_and_exclusions(valid_frame: pd.DataFram
         assert dropped not in cols
     assert "claim_lag_weeks" in cols
     assert "MaritalStatus" in cols
-
-
-def test_categorical_columns() -> None:
-    assert feats.categorical_columns(["Age", "Make", "claim_lag_weeks", "Fault"]) == [
-        "Make",
-        "Fault",
-    ]
-
-
-def test_for_catboost_fills_missing_categoricals() -> None:
-    df = pd.DataFrame({"Make": ["Honda", None], "Age": [30.0, np.nan]})
-    out = feats.for_catboost(df, ["Make", "Age"])
-    assert out["Make"].tolist() == ["Honda", "missing"]
-    assert np.isnan(out.loc[1, "Age"])  # numeric NaN left for CatBoost
-
-
-def test_category_vocab_fixes_levels_and_drops_unseen() -> None:
-    train = pd.DataFrame({"Make": ["b", "a", "b"], "Age": [1.0, 2.0, 3.0]})
-    vocab = feats.CategoryVocab.fit(train, ["Make", "Age"])
-    assert vocab.levels == {"Make": ["a", "b"]}
-    test = vocab.transform(pd.DataFrame({"Make": ["a", "zzz"], "Age": [1.0, 2.0]}), ["Make", "Age"])
-    assert list(test["Make"].cat.categories) == ["a", "b"]
-    assert test["Make"].isna().tolist() == [False, True]

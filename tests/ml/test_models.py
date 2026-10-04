@@ -4,7 +4,7 @@ import pytest
 from sklearn.metrics import roc_auc_score
 
 from autoclaim.ml import models
-from autoclaim.ml.features import TARGET, clean, feature_columns
+from autoclaim.ml.frame import Y, feature_list
 from autoclaim.ml.split import stratified_holdout
 
 
@@ -14,10 +14,9 @@ def _few_trees(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def prepared(fraud_frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
-    df = clean(fraud_frame)
-    train, test = stratified_holdout(df, 0.3, seed=0)
-    return train, test, feature_columns(df, exclude=["Sex", "MaritalStatus"])
+def prepared(fraud_std: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    train, test = stratified_holdout(fraud_std, 0.3, seed=0)
+    return train, test, feature_list(fraud_std, exclude=["Sex", "MaritalStatus"])
 
 
 @pytest.mark.parametrize("name", list(models.MODELS))
@@ -28,7 +27,7 @@ def test_each_model_learns_the_planted_signal(name: str, prepared) -> None:
     proba = model.fit(inner, val).predict_proba(test)
     assert proba.shape == (len(test),)
     assert np.all((proba >= 0) & (proba <= 1))
-    assert roc_auc_score(test[TARGET], proba) > 0.65
+    assert roc_auc_score(test[Y], proba) > 0.65
 
 
 @pytest.mark.parametrize("name", list(models.MODELS))

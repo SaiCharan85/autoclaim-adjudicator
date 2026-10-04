@@ -5,6 +5,7 @@ import pytest
 
 from autoclaim.ml.metrics import (
     bootstrap_ci,
+    net_savings_per_1k,
     paired_bootstrap_diff,
     precision_at_budget,
     recall_at_budget,
@@ -93,3 +94,14 @@ def test_paired_diff_detects_real_gap() -> None:
 def test_paired_diff_of_identical_scores_is_zero() -> None:
     y, good, _ = _rng_data()
     assert paired_bootstrap_diff(y, good, good, _recall10, n_boot=50) == (0.0, 0.0, 0.0)
+
+
+def test_net_savings_per_1k() -> None:
+    # top 30% = 3 reviewed claims; 2 are fraud worth 1000 + 3000; reviews cost 3 x 100
+    amount = np.array([1000, 50, 3000, 0, 0, 0, 0, 0, 0, 9999])
+    assert net_savings_per_1k(Y, S, amount, 0.3, 100) == pytest.approx((4000 - 300) / 10 * 1000)
+
+
+def test_net_savings_can_be_negative() -> None:
+    y = np.zeros(10)
+    assert net_savings_per_1k(y, np.arange(10), np.ones(10), 0.5, 100) < 0

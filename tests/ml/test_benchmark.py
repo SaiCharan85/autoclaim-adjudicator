@@ -1,10 +1,14 @@
+from dataclasses import replace
+
+import numpy as np
 import pandas as pd
 import pytest
 
 from autoclaim.config import FraudModelConfig
+from autoclaim.lines.auto.simulator.columns import LeakageError, assert_fnol_only
 from autoclaim.ml import models
-from autoclaim.ml.benchmark import evaluate_cv, evaluate_time_split, run_benchmark
-from autoclaim.ml.features import clean, feature_columns
+from autoclaim.ml.benchmark import evaluate, run_benchmark
+from autoclaim.ml.frame import AMOUNT, Y, feature_list
 
 
 @pytest.fixture(autouse=True)
@@ -12,61 +16,64 @@ def _few_trees(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(models, "MAX_TREES", 60)
 
 
-def test_time_split_result(fraud_frame: pd.DataFrame, small_fraud_cfg: FraudModelConfig) -> None:
-    df = clean(fraud_frame)
-    res = evaluate_time_split(df, "logistic", feature_columns(df), small_fraud_cfg, seed=0)
-    assert res.variant == "time"
-    assert 0 <= res.metrics["pr_auc"] <= 1
-    assert res.metrics["base_rate"] == pytest.approx(df[df["Year"] == 1996]["FraudFound_P"].mean())
-    assert res.fit_seconds >= 0
-
-
-def test_cv_result_has_mean_and_std(
-    fraud_frame: pd.DataFrame, small_fraud_cfg: FraudModelConfig
+def test_evaluate_reports_gap_and_trees(
+    legacy_spec, fraud_std: pd.DataFrame, fraud_cfg: FraudModelConfig
 ) -> None:
-    df = clean(fraud_frame)
-    res = evaluate_cv(df, "catboost", feature_columns(df), small_fraud_cfg, seed=0)
-    assert {"pr_auc_mean", "pr_auc_std", "recall_at_budget_mean"} <= set(res.metrics)
+    train, val, _ = legacy_spec.split(fraud_std)
+    run = evaluate("catboost", feature_list(fraud_std), train, val, 0, fraud_cfg)
+    assert 0 <= run.metrics["pr_auc"] <= 1
+    assert "train_pr_auc" in run.metrics
+    assert run.n_trees is not None
+    assert len(run.scores) == len(val)
+    assert "net_savings_per_1k" not in run.metrics  # no amount column in this dataset
 
 
-def test_run_benchmark_table_with_ablation(
-    fraud_frame: pd.DataFrame, small_fraud_cfg: FraudModelConfig
+def test_evaluate_adds_savings_when_amount_present(
+    legacy_spec, fraud_std: pd.DataFrame, fraud_cfg: FraudModelConfig
 ) -> None:
-    table = run_benchmark(
-        clean(fraud_frame), small_fraud_cfg, seed=0, models=["logistic", "catboost"]
+    frame = fraud_std.assign(**{AMOUNT: 5000.0})
+    train, val, _ = legacy_spec.split(frame)
+    run = evaluate("logistic", feature_list(frame), train, val, 0, fraud_cfg)
+    assert "net_savings_per_1k" in run.metrics
+
+
+def test_validation_only_by_default(
+    legacy_spec, fraud_std: pd.DataFrame, fraud_cfg: FraudModelConfig
+) -> None:
+    bench = run_benchmark(fraud_std, legacy_spec, fraud_cfg, models=["logistic", "catboost"])
+    assert bench.test is None  # the locked test set is untouched without final=True
+    assert list(bench.validation.index) == ["logistic", "catboost", "catboost + Sex/MaritalStatus"]
+    assert "Sex" not in bench.features
+    row = bench.validation.loc["logistic"]
+    assert row["pr_auc"].count("+/-") == 1  # mean +/- std over seeds
+    assert row["delta_recall_vs_catboost"].startswith(("+", "-"))
+    assert bench.validation.loc["catboost", "delta_recall_vs_catboost"] == "n/a"
+    assert bench.validation.to_string().isascii()  # Windows consoles can't print every symbol
+
+
+def test_final_scores_the_test_set(
+    legacy_spec, fraud_std: pd.DataFrame, fraud_cfg: FraudModelConfig
+) -> None:
+    bench = run_benchmark(
+        fraud_std, legacy_spec, fraud_cfg, models=["logistic"], final=True, ablation_model=None
     )
-    assert list(table.index) == ["logistic", "catboost", "catboost + Sex/MaritalStatus"]
-    assert {"pr_auc_1996", "recall@budget_1996", "pr_auc_cv", "n_trees", "fit_s"} <= set(
-        table.columns
-    )
-    assert table.loc["logistic", "n_trees"] == "n/a"
-    assert table["pr_auc_1996"].between(0, 1).all()
-    assert table.loc["catboost", "delta_recall_vs_catboost"] == "n/a"
-    assert table.loc["logistic", "delta_recall_vs_catboost"].startswith(("+", "-"))
-    assert table.loc["logistic", "pr_auc_1996_ci"].startswith("[")
-    # Windows consoles (cp1252) can't print symbols like a Greek delta; keep the table ASCII.
-    assert table.to_string().isascii()
+    assert bench.test is not None
+    assert list(bench.test.index) == ["logistic"]
 
 
-def test_no_ablation_without_sensitive_features(
-    fraud_frame: pd.DataFrame, small_fraud_cfg: FraudModelConfig
+def test_leaky_feature_is_rejected(
+    legacy_spec, fraud_std: pd.DataFrame, fraud_cfg: FraudModelConfig
 ) -> None:
-    cfg = small_fraud_cfg.model_copy(update={"sensitive_features": []})
-    table = run_benchmark(clean(fraud_frame), cfg, seed=0, models=["logistic"])
-    assert list(table.index) == ["logistic"]
+    strict = replace(legacy_spec, check_features=assert_fnol_only)  # 1990s names aren't tagged
+    with pytest.raises(LeakageError):
+        run_benchmark(fraud_std, strict, fraud_cfg, models=["logistic"])
 
 
-def test_time_split_keeps_test_predictions(
-    fraud_frame: pd.DataFrame, small_fraud_cfg: FraudModelConfig
+def test_train_eval_gap_reported(
+    legacy_spec, fraud_std: pd.DataFrame, fraud_cfg: FraudModelConfig
 ) -> None:
-    df = clean(fraud_frame)
-    res = evaluate_time_split(df, "logistic", feature_columns(df), small_fraud_cfg, seed=0)
-    assert len(res.scores) == len(res.y_test) == int((df["Year"] == 1996).sum())
-
-
-def test_no_reference_model_in_run(
-    fraud_frame: pd.DataFrame, small_fraud_cfg: FraudModelConfig
-) -> None:
-    cfg = small_fraud_cfg.model_copy(update={"sensitive_features": []})
-    table = run_benchmark(clean(fraud_frame), cfg, seed=0, models=["logistic", "xgboost"])
-    assert (table["delta_recall_vs_catboost"] == "n/a").all()
+    rng = np.random.default_rng(0)
+    noisy = fraud_std.assign(**{Y: rng.integers(0, 2, len(fraud_std))})
+    bench = run_benchmark(noisy, legacy_spec, fraud_cfg, models=["catboost"], ablation_model=None)
+    gap = float(bench.validation.loc["catboost", "train_minus_eval_pr_auc"].split()[0])
+    assert gap >= 0  # random labels: a model can only look better on its own training rows

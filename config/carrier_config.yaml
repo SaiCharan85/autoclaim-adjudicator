@@ -16,15 +16,43 @@ harness:
   max_retries: 2          # critic/judge -> adjudicator retry loop
   seed: 42
 
-# Step 2: fraud model. Production model is trained on train_years only, so synthetic eval claims
-# generated from test_years rows never leak into the fraud score.
+# Fraud model. Production trains on the grounded-hybrid simulator (real CRSS crashes + simulated
+# policy/fraud); the real 1994–96 labels are the reality check. 3-way time splits: train /
+# validation (all decisions) / locked test (only with --final, logged in docs/test_set_log.md).
 fraud_model:
-  train_years: [1994, 1995]
-  test_years: [1996]
-  review_budget: 0.05     # share of claims the fraud team (SIU) can review; recall is measured at this cut
-  cv_folds: 5
-  # Excluded from the production model (several US states restrict their use); ablation only.
-  sensitive_features: [Sex, MaritalStatus]
+  production_dataset: sim_us
+  review_budget: 0.05          # share of claims the fraud team (SIU) can review; recall is measured at this cut
+  seeds: [42, 43, 44]          # every benchmark number is mean +/- std over these
+  siu_review_cost_usd: 300     # assumed cost of one investigation, for the net-savings metric
+  datasets:
+    sim_us:
+      val_start: "2024-01-01"
+      test_start: "2024-07-01"
+      sensitive_features: []   # the simulator generates no sex or marital status
+    legacy_1990s:
+      train_years: [1994, 1995]
+      test_years: [1996]
+      val_fraction: 0.2        # latest 20% of the training years
+      # Excluded from the model (several US states restrict their use); ablation only.
+      sensitive_features: [Sex, MaritalStatus]
+
+# Jurisdiction profiles: the policy's common core is the same everywhere; these rules differ.
+# Plain English: in the US, hitting a deer is a "comprehensive" loss (separate coverage and
+# deductible); in UK/EU-style own-damage cover it is ordinary accidental damage.
+jurisdiction: US
+jurisdictions:
+  US:
+    terms: {deductible: deductible, own_damage: "collision / comprehensive"}
+    comprehensive_causes: [animal, theft, vandalism, hail_weather, glass, fire]
+    hit_and_run_police_report_hours: 24
+    late_notice_days: 30          # beyond this, notice is late; most states then require prejudice -> human review
+    total_loss_threshold: 0.75    # damage >= 75% of actual cash value -> total loss
+  UK_EU:
+    terms: {deductible: excess, own_damage: "own damage"}
+    comprehensive_causes: [theft, vandalism, hail_weather, glass, fire]
+    hit_and_run_police_report_hours: 24
+    late_notice_days: 30
+    total_loss_threshold: 0.70
 
 # Step 3: deductibles per coverage (collision vs. comprehensive)
 deductibles: {}

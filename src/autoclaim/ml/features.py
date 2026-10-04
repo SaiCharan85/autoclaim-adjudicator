@@ -1,6 +1,6 @@
-"""Cleaning and feature preparation for the fraud table.
+"""Cleaning for the real 1994-96 Kaggle fraud table (the reality-check dataset).
 
-Decisions are explained in docs/data_notes.md.
+Decisions are explained in docs/data_notes.md. Generic modeling helpers live in ml/frame.py.
 """
 
 from collections.abc import Sequence
@@ -20,15 +20,6 @@ MONTH_INDEX = {
 # Not features: unique ID, redundant with BasePolicy (+ inconsistent), carrier-internal rep ID,
 # and calendar year (drifts; future years are never seen in training).
 NON_FEATURES = ("PolicyNumber", "PolicyType", "RepNumber", "Year")
-
-NUMERIC_FEATURES = (
-    "Age",
-    "WeekOfMonth",
-    "WeekOfMonthClaimed",
-    "DriverRating",
-    "Deductible",
-    "claim_lag_weeks",
-)
 
 
 def claim_lag_weeks(df: pd.DataFrame) -> pd.Series:
@@ -62,35 +53,3 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
 def feature_columns(df: pd.DataFrame, exclude: Sequence[str] = ()) -> list[str]:
     drop = {TARGET, *NON_FEATURES, *exclude}
     return [c for c in df.columns if c not in drop]
-
-
-def categorical_columns(columns: Sequence[str]) -> list[str]:
-    return [c for c in columns if c not in NUMERIC_FEATURES]
-
-
-def for_catboost(df: pd.DataFrame, columns: Sequence[str]) -> pd.DataFrame:
-    """CatBoost needs string categoricals without NaN."""
-    out = df[list(columns)].copy()
-    for c in categorical_columns(columns):
-        out[c] = out[c].astype("string").fillna("missing").astype(str)
-    return out
-
-
-class CategoryVocab:
-    """Fixed category levels learned on training data, so train/test/runtime encode identically."""
-
-    def __init__(self, levels: dict[str, list[str]]) -> None:
-        self.levels = levels
-
-    @classmethod
-    def fit(cls, df: pd.DataFrame, columns: Sequence[str]) -> "CategoryVocab":
-        cats = categorical_columns(columns)
-        return cls({c: sorted(df[c].dropna().astype(str).unique().tolist()) for c in cats})
-
-    def transform(self, df: pd.DataFrame, columns: Sequence[str]) -> pd.DataFrame:
-        """pandas `category` dtype with fixed levels; unseen values become NaN."""
-        out = df[list(columns)].copy()
-        for c, levels in self.levels.items():
-            if c in out:
-                out[c] = pd.Categorical(out[c].astype("string"), categories=levels)
-        return out

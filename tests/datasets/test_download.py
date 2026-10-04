@@ -1,10 +1,11 @@
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
 
 from autoclaim.datasets import download as dl
-from autoclaim.datasets.sources import DatasetSource
+from autoclaim.datasets.sources import CRSS, DatasetSource, UrlSource
 
 SOURCE = DatasetSource(
     key="toy", kaggle_ref="owner/toy", files=("a.csv", "b.csv"), description="toy"
@@ -140,6 +141,7 @@ def test_main_defaults_to_all_sources(
 ) -> None:
     monkeypatch.setenv("AUTOCLAIM_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(dl, "SOURCES", {"toy": SOURCE})
+    monkeypatch.setattr(dl, "URL_SOURCES", {})
     assert dl.main([], api_factory=FakeKaggleApi) == 0
     assert "[toy]" in capsys.readouterr().out
 
@@ -147,3 +149,118 @@ def test_main_defaults_to_all_sources(
 def test_main_rejects_unknown_source() -> None:
     with pytest.raises(SystemExit):
         dl.main(["not_a_source"])
+
+
+# ---------------------------------------------------------------- URL (zip) sources
+
+URL_SOURCE = UrlSource(
+    key="toy_url",
+    url="https://example.invalid/toy.zip",
+    files=("accident.csv", "vehicle.csv"),
+    license="Public domain",
+    description="toy",
+)
+
+
+def make_zip_fetcher(members: dict[str, str]):
+    calls = []
+
+    def fetch(url: str, path: Path) -> None:
+        calls.append(url)
+        with zipfile.ZipFile(path, "w") as zf:
+            for name, body in members.items():
+                zf.writestr(name, body)
+
+    fetch.calls = calls  # type: ignore[attr-defined]
+    return fetch
+
+
+GOOD_MEMBERS = {
+    "TOY2024CSV/ACCIDENT.CSV": "CASENUM\n1\n",  # case differs from the requested name
+    "TOY2024CSV/vehicle.csv": "CASENUM,VEH_NO\n1,1\n",
+    "TOY2024CSV/person.csv": "unused\n",
+}
+
+
+def test_download_url_extracts_only_requested_files(tmp_path: Path) -> None:
+    fetch = make_zip_fetcher(GOOD_MEMBERS)
+    manifest, downloaded = dl.download_url(URL_SOURCE, tmp_path, fetch)
+    assert downloaded
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "accident.csv",
+        dl.MANIFEST_NAME,
+        "vehicle.csv",
+    ]  # person.csv skipped, archive deleted
+    assert manifest.url == URL_SOURCE.url
+    assert manifest.licenses == ["Public domain"]
+    assert manifest.archive_sha256 is not None
+    assert manifest.files["vehicle.csv"] == dl.sha256_file(tmp_path / "vehicle.csv")
+
+
+def test_download_url_is_cached(tmp_path: Path) -> None:
+    fetch = make_zip_fetcher(GOOD_MEMBERS)
+    dl.download_url(URL_SOURCE, tmp_path, fetch)
+    _, downloaded = dl.download_url(URL_SOURCE, tmp_path, fetch)
+    assert not downloaded
+    assert len(fetch.calls) == 1
+
+
+def test_download_url_redownloads_tampered_file(tmp_path: Path) -> None:
+    fetch = make_zip_fetcher(GOOD_MEMBERS)
+    dl.download_url(URL_SOURCE, tmp_path, fetch)
+    (tmp_path / "accident.csv").write_text("tampered", encoding="utf-8")
+    assert dl.download_url(URL_SOURCE, tmp_path, fetch)[1]
+
+
+def test_download_url_missing_member_raises_and_cleans_up(tmp_path: Path) -> None:
+    fetch = make_zip_fetcher({"X/accident.csv": "a\n"})
+    with pytest.raises(dl.DatasetFileMissingError, match=r"vehicle\.csv"):
+        dl.download_url(URL_SOURCE, tmp_path, fetch)
+    assert not (tmp_path / "_download.zip").exists()
+    assert dl.read_manifest(tmp_path) is None
+
+
+def test_failed_fetch_leaves_no_archive(tmp_path: Path) -> None:
+    def broken(url: str, path: Path) -> None:
+        path.write_bytes(b"partial")
+        raise OSError("network down")
+
+    with pytest.raises(OSError, match="network down"):
+        dl.download_url(URL_SOURCE, tmp_path, broken)
+    assert not (tmp_path / "_download.zip").exists()
+
+
+def test_legacy_kaggle_manifest_still_loads(tmp_path: Path) -> None:
+    (tmp_path / dl.MANIFEST_NAME).write_text(
+        json.dumps(
+            {
+                "source_key": "vehicle_fraud",
+                "kaggle_ref": "o/d",
+                "files": {},
+                "licenses": ["CC0-1.0"],
+                "downloaded_at": "2026-10-04T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = dl.read_manifest(tmp_path)
+    assert manifest is not None
+    assert manifest.url is None
+
+
+def test_crss_registry_covers_recent_years() -> None:
+    assert set(CRSS) == {2022, 2023, 2024}
+    for year, src in CRSS.items():
+        assert src.url.endswith(f"/CRSS/{year}/CRSS{year}CSV.zip")
+        assert "Public domain" in src.license
+        assert "vehicle.csv" in src.files
+
+
+def test_main_downloads_url_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("AUTOCLAIM_DATA_DIR", str(tmp_path))
+    monkeypatch.setitem(dl.URL_SOURCES, "toy_url", URL_SOURCE)
+    assert dl.main(["toy_url"], fetch=make_zip_fetcher(GOOD_MEMBERS)) == 0
+    assert "[toy_url] downloaded" in capsys.readouterr().out
+    assert (tmp_path / "raw" / "toy_url" / "vehicle.csv").exists()

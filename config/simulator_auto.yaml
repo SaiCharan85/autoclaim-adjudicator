@@ -1,0 +1,173 @@
+# World parameters for the grounded-hybrid auto claims builder (US, 2022–2024).
+#
+# REAL: every claim's incident context (date, hour, region, urban/rural, weather, light, vehicle
+# make/model/year/body) comes from an NHTSA CRSS police-reported crash record. Police-reported
+# collision, animal, hit-and-run, parked-hit and fire claims are those real crashes, including
+# their real damage extent, towing, injuries and number of vehicles.
+# SIMULATED (modeling assumptions, rounded; not statistics about any real insurer): policy terms,
+# vehicle value, amounts, fraud, traps, and causes police data cannot contain (glass, hail, theft,
+# vandalism, mechanical, unreported minor damage). Rationale per block: docs/simulator.md.
+
+seed: 42
+n_claims: 50000
+loss_date_start: "2022-01-01"   # bounded by the real CRSS years
+loss_date_end: "2024-12-31"
+
+# US states: relative weights, used to pick a state WITHIN each real crash's census region
+# (CRSS publishes region, not state). Weights ~ relative population (assumed).
+states:
+  CA: 0.18
+  TX: 0.14
+  FL: 0.11
+  NY: 0.09
+  PA: 0.065
+  IL: 0.06
+  OH: 0.055
+  GA: 0.05
+  NC: 0.05
+  MI: 0.045
+  NJ: 0.04
+  AZ: 0.035
+  WA: 0.035
+  CO: 0.03
+  MN: 0.03
+out_of_state_loss_rate: 0.06        # assumed
+
+# Coverage on policies that FILE an own-damage claim (assumed). Not the real data's BasePolicy
+# mix: its 32% "Liability" rows are liability claims; liability-only holders rarely file for their
+# own car. Collision without comprehensive is uncommon (lenders require both).
+coverage_mix:
+  liability_only: 0.05
+  collision: 0.12
+  collision_comprehensive: 0.83
+collision_deductibles: {250: 0.10, 500: 0.55, 1000: 0.30, 2000: 0.05}       # assumed
+comprehensive_deductibles: {0: 0.05, 250: 0.25, 500: 0.50, 1000: 0.20}      # assumed
+rideshare_endorsement_rate: 0.03    # share of policies with a rideshare/delivery endorsement (assumed)
+policy_term_days: 365
+
+# Who was driving
+driver_role:                          # assumed
+  named_insured: 0.80
+  listed_driver: 0.15
+  permissive_unlisted: 0.04
+  excluded_driver: 0.01
+driver_age: {min: 16, max: 90, mean: 44, sd: 16}
+
+# Vehicles (2023–2026 market; assumed)
+vehicle_age_years: {mean: 9, sd: 5, max: 25}        # only when the real model year is unknown
+new_vehicle_price: {median: 42000, sigma: 0.25}     # lognormal noise around body_new_price
+depreciation_per_year: 0.12
+min_acv: 1500
+financed_rate_by_age: {new_max_age: 5, new: 0.70, old: 0.20}
+adas_rate_by_age: {new_max_age: 6, new: 0.85, old: 0.25}
+# Makes come from the real crash records. Kia/Hyundai theft wave (real 2022–23 trend, decaying
+# after anti-theft software updates); multiplier shape assumed.
+kia_hyundai_theft_multiplier: {"2022": 3.0, "2023": 2.5, "2024": 1.5}
+
+# Cause of loss for legitimate claims (assumed). Six traps are planted on top (see `traps`).
+loss_causes:
+  collision_vehicle: 0.36
+  collision_object: 0.10
+  parked_hit: 0.08
+  animal: 0.07
+  theft: 0.05
+  vandalism: 0.04
+  hail_weather: 0.07
+  glass: 0.15
+  fire: 0.01
+  hit_and_run: 0.05
+  mechanical_breakdown: 0.02
+# Seasonality comes from the real crash dates (e.g. deer strikes peak Oct–Dec in CRSS).
+use_at_loss: {personal: 0.81, commute: 0.17, rideshare_active: 0.01, delivery_active: 0.01}
+
+# Damage (fraction of ACV) by cause; lognormal median, sigma (assumed)
+damage_fraction:
+  collision_vehicle: [0.18, 0.8]
+  collision_object: [0.15, 0.8]
+  parked_hit: [0.07, 0.7]
+  animal: [0.15, 0.7]
+  theft: [1.0, 0.0]          # total loss of the vehicle
+  vandalism: [0.05, 0.8]
+  hail_weather: [0.10, 0.7]
+  glass: [0.03, 0.5]
+  fire: [0.60, 0.6]
+  hit_and_run: [0.12, 0.8]
+  mechanical_breakdown: [0.08, 0.6]
+adas_glass_recalibration_usd: 450   # total-loss threshold lives in the jurisdiction profile
+
+# Share of each cause that is police-reported. For causes CRSS covers, that share of claims IS a
+# real crash record; the rest are simulated unreported claims. (assumed rates)
+police_report_rate:
+  collision_vehicle: 0.70
+  collision_object: 0.35
+  parked_hit: 0.40
+  animal: 0.30
+  theft: 0.97
+  vandalism: 0.60
+  hail_weather: 0.02
+  glass: 0.01
+  fire: 0.25            # most vehicle fires are electrical/mechanical, not crashes
+  hit_and_run: 0.85
+  mechanical_breakdown: 0.0   # a breakdown is not a crash
+police_report_hours: {median: 2, sigma: 1.2}     # lognormal hours after the loss
+witness_rate: {collision_vehicle: 0.45, collision_object: 0.20, parked_hit: 0.15, default: 0.10}
+# Repair cost as a fraction of vehicle value, by REAL police-reported damage extent (assumed)
+damage_by_extent:
+  none: [0.02, 0.5]
+  minor: [0.06, 0.6]
+  functional: [0.18, 0.6]
+  disabling: [0.55, 0.5]
+towed_damage_multiplier: 1.4
+body_new_price: {car: 34000, suv: 44000, pickup: 52000, van: 42000, light_unknown: 40000}
+luxury_makes: [BMW, Mercedes-Benz, Audi, Lexus, Tesla, Porsche, Cadillac, Lincoln, Volvo,
+               Land Rover, Acura, Infiniti, Genesis]
+luxury_multiplier: 1.6
+notice_days: {median: 2, sigma: 1.1}             # lognormal days from loss to first notice
+injury_rate: {collision_vehicle: 0.22, collision_object: 0.10, animal: 0.05, default: 0.0}
+at_fault_rate: {collision_vehicle: 0.55, collision_object: 1.0, default: 0.0}
+
+# Fraud (latent truth). Overall rate and the coverage / at-fault / inception relationships are
+# calibrated to the real data: fraud is ~10x rarer when only liability coverage exists, ~8x rarer
+# when not at fault, and ~2-3x likelier within ~2 weeks of policy start.
+fraud:
+  base_rate: 0.08          # latent; ~75% detected -> ~6% confirmed, matching the real data
+  coverage_multiplier: {liability_only: 0.10, collision: 1.15, collision_comprehensive: 1.6}
+  # Profiles that make a fraud type possible, and how much they raise fraud odds (assumed)
+  profile_multiplier: {give_up: 3.0, prior_damage: 2.5, staged: 2.0}
+  # Fraud type follows the claim's profile: theft of a financed car -> owner give-up; unreported
+  # single-vehicle/parked damage -> prior damage (60%); urban police-reported multi-vehicle crash
+  # with injuries -> staged collision (50%); everything else -> inflated damage.
+  prior_damage_share: 0.6
+  staged_share: 0.5
+  detection_rate: 0.75       # share of fraud confirmed by investigators -> observed label
+  early_inception_share: 0.12      # share of frauds whose loss is within 15 days of policy start
+  legit_early_inception_share: 0.012
+  inflation_factor: [1.3, 2.5]     # inflated_damage: claimed = true damage x U(lo, hi)
+  late_notice_share: 0.35          # prior_damage / give-up report late more often
+  address_change_recent_share: 0.10
+  legit_address_change_recent_share: 0.01
+
+# Six coverage traps planted at these rates (enriched above real-world frequency so evals see them)
+traps:
+  animal_on_collision_only: 0.015    # deer strike when the policy lacks comprehensive
+  business_use_no_endorsement: 0.015 # rideshare/delivery active without endorsement
+  excluded_driver: 0.010
+  wear_and_tear: 0.015               # mechanical breakdown / wear (excluded)
+  hit_and_run_no_timely_report: 0.012
+  late_notice: 0.015
+
+# Extra evaluation sets, drawn only from the locked test window and from real records the main
+# dataset did not use (so no crash appears twice).
+holdouts:
+  test_window_start: "2024-07-01"
+  fresh:                     # same world, new seed: is performance stable on new draws?
+    seed: 43
+    n_claims: 8000
+  shift:                     # perturbed world: did the model learn fraud or simulator quirks?
+    seed: 44
+    n_claims: 8000
+    overrides:
+      fraud.profile_multiplier: {give_up: 1.5, prior_damage: 4.0, staged: 3.0}
+      fraud.inflation_factor: [1.15, 1.6]
+      fraud.prior_damage_share: 0.8
+      coverage_mix: {liability_only: 0.08, collision: 0.20, collision_comprehensive: 0.72}

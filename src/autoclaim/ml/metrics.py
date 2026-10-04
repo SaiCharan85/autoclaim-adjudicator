@@ -37,6 +37,17 @@ def precision_at_budget(y_true: ArrayLike, scores: ArrayLike, budget: float) -> 
     return float(y[_top_k_mask(s, budget)].mean())
 
 
+def net_savings_per_1k(
+    y_true: ArrayLike, scores: ArrayLike, amount: ArrayLike, budget: float, review_cost: float
+) -> float:
+    """Cost-sensitive view (cf. Yankol-Schalck 2025): dollars of fraudulent claims caught in the
+    review budget minus the cost of the reviews, per 1,000 claims. Higher is better."""
+    y, s, a = np.asarray(y_true), np.asarray(scores, dtype=float), np.asarray(amount, dtype=float)
+    reviewed = _top_k_mask(s, budget)
+    caught = float(np.nansum(a[reviewed & (y == 1)]))
+    return float((caught - reviewed.sum() * review_cost) / len(y) * 1000)
+
+
 Metric = Callable[[np.ndarray, np.ndarray], float]
 
 

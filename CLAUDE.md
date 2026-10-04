@@ -72,6 +72,17 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - Seeded randomness (`harness.seed` in config). Config over constants. No secrets in code.
 - ruff (lint + format), line length 100.
 
+## 5b. Leakage and overfitting rules (user requirement; enforced by tests)
+- **First-notice-only features:** every simulator column is tagged `fnol` / `post_fnol` / `ground_truth`;
+  only `fnol` columns may be model features. **The harness never imports the ground-truth oracle.**
+- **Canaries every training run:** shuffled-label ROC-AUC ≈ 0.5, and flag any single feature with ROC-AUC > 0.9.
+- **Time order:** train on the past, test on the future; every encoder, scaler, vocab and reference fit on train only.
+- **3-way split:** train / validation (all decisions) / **locked test**, touched only with `--final` and
+  logged in `docs/test_set_log.md`. Plus a fresh-seed simulator holdout and a perturbed-world shift test.
+- **Overfitting:** early stopping on validation; report train-vs-validation gap; 3 seeds (mean ± std).
+- **Harness evals:** eval claims from the test period only; few-shot, feedback memory and fine-tuning
+  data from train/validation only. A/B = same claims, metric fixed in advance, paired bootstrap, no peeking.
+
 ## 6. Data and copyright rules
 - Never commit data, model weights, FAISS indexes, or caches (`data/`, `models/`, `.cache/`, `*.faiss` are ignored).
 - Never paste ISO policy forms, NICB publications, or Kaggle data into the repo.
@@ -88,8 +99,18 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
   The primary cache is **exact-match** (hash of model + messages + params). **Never semantic-cache decision-path
   calls** (intake, coverage, fraud, adjudicator, judge): near-identical claims differ precisely on the traps.
   Similarity is used to *retrieve context* (feedback memory), never to *reuse answers*.
-- Token hygiene: static content (system prompt, rubric, schema) first so provider prefix caching applies; send only
-  graph-expanded clauses, never the whole policy; cap output tokens per role; code checks run before LLM checks.
+- **Token + request frugality (user rule): never waste tokens or requests/day.**
+  - Persistent per-model daily counter (requests, tokens) with a hard stop below the free-tier limit;
+    limits live in config. Tripping it falls back to the next provider or stops; it never silently retries.
+  - Every batch job has a `--dry-run` that prints estimated requests/tokens/time before spending anything.
+  - Batch several items per request where quality allows (requests/day is usually the binding limit).
+  - Compact prompts: static prefix first (provider prefix caching), compact JSON schemas, only the
+    graph-expanded clauses, few-shot only when measured to help. Cap `max_tokens` per role; lowest
+    reasoning effort that works.
+  - Code decides first: deterministic checks (guardrails, hard router rules, critic) run before any
+    LLM call, and an LLM is skipped when its answer can't change the outcome.
+  - Development: mocks in tests; at most one tiny live smoke test per integration; never a live call
+    just to look something up (read the console or docs instead).
 - Cheapest adequate model per role.
 - Pilot (~50) before any full run.
 - Before any large run, show the estimated request/token count against free-tier limits and the wall-clock time.
@@ -104,9 +125,11 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 | Lint | `uv run ruff check . && uv run ruff format --check .` |
 | Type check | `uv run mypy` |
 | Test | `uv run pytest` (real-data tests auto-skip if `data/` is absent) |
-| Download data | `uv run python scripts/download_data.py` (needs `KAGGLE_API_TOKEN` in `.env`) |
+| Download data | `uv run python scripts/download_data.py` (CRSS 2022–24 + Kaggle; Kaggle needs `KAGGLE_API_TOKEN`) |
+| Build claims | `uv run python scripts/simulate_claims.py` → `data/sim/` (grounded hybrid, ~1 s) |
 | Profile data | `uv run python scripts/profile_data.py` → `docs/data_profile.md` |
-| Train fraud model | `uv run python scripts/train_fraud.py` (~6 min; `--skip-benchmark` ~10 s) → `models/fraud/`, `docs/fraud_benchmark.md` |
+| Train fraud model | `uv run python scripts/train_fraud.py [--dataset sim_us\|legacy_1990s] [--skip-benchmark]` → validation only |
+| Locked test | `uv run python scripts/train_fraud.py --final` (scores test + holdouts once; appends `docs/test_set_log.md`) |
 | Run demo | _TBD (Step 9)_ |
 | Run eval | _TBD (Step 8)_ |
 
@@ -114,6 +137,8 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - ☑ Step 0 — Foundations (CLAUDE.md, pyproject, skeleton, CI, DATA.md, README stub)
 - ☑ Step 1 — Data layer (Kaggle download, schemas, profile → `docs/data_notes.md`)
 - ☑ Step 2 — Fraud ML (5-model benchmark, CatBoost + SHAP, Isolation Forest, rules, model card)
+- ☑ Step 2b — Real recent data: NHTSA CRSS 2022–24 grounded-hybrid claims, dataset specs, leakage
+  canaries, 3-way splits + locked test log, seeds, savings metric (`docs/simulator.md`)
 - ☐ Step 3 — Policy & retrieval (policy YAML, NetworkX graph, BM25 + HNSW + RRF, k-hop, benchmark doc)
 - ☐ Step 4 — Synthetic claims (row-conditioned, red flags, 6 traps, messiness; pilot 50 → full 300–500)
 - ☐ Step 5 — Harness core (state, nodes, edges, checkpointer, router, audit, fallback, budgets, idempotency)
@@ -122,13 +147,20 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - ☐ Step 7.5 — Fine-tuning on Kaggle (free GPU, QLoRA): intake extractor, small judge, adjudicator
   (distillation). Leakage-safe splits by source row, `finetune` dependency group only, GGUF → Ollama export
 - ☐ Step 8 — Evaluation (`run_eval.py`, metrics, ablations incl. base vs. fine-tuned, learning loop, `eval/report.md`)
+  + fraud A/B: ML-only vs LLM-only vs hybrid on ~200 test claims (cached; user decision 2026-10-04)
+- ☐ Step 8.5 — Flood line module on real FEMA NFIP claims (plug-in demo; after the auto harness works)
 - ☐ Step 9 — Adjuster console (Streamlit, resume interrupted claims, demo script)
 - ☐ Step 10 — Polish (final README, architecture doc, playbook, CI badge, limitations)
 
 Decisions so far: LLMs = hybrid free (Groq + Google AI Studio free tiers, local Ollama fallback;
 judge from a different model family than the adjudicator), tracing = LangSmith (free Developer tier),
-large batch generation + fine-tuning = Kaggle free GPU notebooks (vLLM / QLoRA), free Colab as overflow
+embeddings = local only: bge-large-en-v1.5 via fastembed (user choice; the retrieval benchmark still
+reports small/base for reference; no API embeddings for now), large batch generation + fine-tuning = Kaggle free GPU notebooks (vLLM / QLoRA), free Colab as overflow
 (GPU jobs must be platform-agnostic and checkpoint often so they can resume after a disconnect).
+
+**Backlog (user: "later")**: repair-cost residual feature for inflated claims (79% of fraud, 37.5% caught);
+older real crashes CRSS 2016–2021 for a drift study. Headroom (validation): model at ~55% of the label-noise
+ceiling (PR-AUC 0.418 vs 0.761); vs true fraud, precision@5% = 0.675.
 
 ## 10. Explanation style
 The user is an experienced ML/NLP engineer with little insurance domain knowledge.

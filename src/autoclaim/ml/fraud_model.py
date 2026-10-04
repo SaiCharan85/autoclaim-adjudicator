@@ -1,7 +1,8 @@
 """Train, save and load the production fraud artifacts (CatBoost + Isolation Forest).
 
-Trained on `train_years` only. The test years stay unseen, so Step 4 can build evaluation claims
-from those rows without the fraud score having memorized them.
+Fit on train + validation (everything before the locked test window). The tree count is chosen
+by early stopping on the latest slice of that period. Test metrics are computed only with
+final=True, so the locked test set is never touched by accident.
 """
 
 import hashlib
@@ -19,10 +20,11 @@ from catboost import CatBoostClassifier
 
 from autoclaim.config import FraudModelConfig
 from autoclaim.ml.anomaly import AnomalyScorer
-from autoclaim.ml.features import TARGET, categorical_columns, feature_columns, for_catboost
+from autoclaim.ml.frame import Y, categorical_columns, feature_list, for_catboost
 from autoclaim.ml.metrics import score_report
-from autoclaim.ml.models import CatBoostModel
-from autoclaim.ml.split import latest_slice, time_split
+from autoclaim.ml.models import CATBOOST_PARAMS, CatBoostModel
+from autoclaim.ml.spec import DatasetSpec
+from autoclaim.ml.split import assert_time_ordered, latest_slice
 from autoclaim.paths import models_dir
 
 MODEL_FILE = "catboost.cbm"
@@ -35,64 +37,73 @@ class FraudArtifacts:
     model: CatBoostClassifier
     anomaly: AnomalyScorer
     features: list[str]
+    categorical: list[str]
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def version(self) -> str:
         return str(self.metadata.get("version", "unversioned"))
 
+    @property
+    def dataset(self) -> str:
+        return str(self.metadata.get("dataset", "unknown"))
+
     def predict_proba(self, frame: pd.DataFrame) -> pd.Series:
-        proba = self.model.predict_proba(for_catboost(frame, self.features))[:, 1]
-        return pd.Series(proba, index=frame.index)
+        x = for_catboost(frame, self.features, self.categorical)
+        return pd.Series(self.model.predict_proba(x)[:, 1], index=frame.index)
+
+    def test_metrics(self, frame: pd.DataFrame, budget: float) -> dict[str, dict[str, float]]:
+        return {
+            "catboost": score_report(frame[Y], self.predict_proba(frame), budget),
+            "isolation_forest": score_report(frame[Y], self.anomaly.score(frame), budget),
+        }
 
 
 def train_final(
-    df: pd.DataFrame, cfg: FraudModelConfig, seed: int, data_sha256: str | None = None
+    frame: pd.DataFrame,
+    spec: DatasetSpec,
+    cfg: FraudModelConfig,
+    seed: int,
+    final: bool = False,
+    data_sha256: str | None = None,
 ) -> FraudArtifacts:
-    """Pick the tree count by early stopping on the latest training slice, then refit on all
-    training years with that count, and report metrics on the untouched test years."""
-    features = feature_columns(df, exclude=cfg.sensitive_features)
-    train, test = time_split(df, cfg.train_years, cfg.test_years)
+    train, val, test = spec.split(frame)
+    assert_time_ordered(train, val, test)
+    fit_set = pd.concat([train, val])
+    features = feature_list(frame, exclude=spec.sensitive)
+    spec.check_features(features)
 
-    inner, val = latest_slice(train, 0.2)
-    probe = CatBoostModel(features, seed).fit(inner, val)
+    inner, es = latest_slice(fit_set, 0.2)
+    probe = CatBoostModel(features, seed).fit(inner, es)
     n_trees = max(1, probe.model.get_best_iteration() + 1)
-
-    final = CatBoostClassifier(
+    cats = categorical_columns(fit_set, features)
+    model = CatBoostClassifier(
         iterations=n_trees,
-        learning_rate=0.05,
-        depth=6,
+        **CATBOOST_PARAMS,
         random_seed=seed,
         verbose=0,
         allow_writing_files=False,
     )
-    final.fit(
-        for_catboost(train, features), train[TARGET], cat_features=categorical_columns(features)
-    )
-    artifacts = FraudArtifacts(final, AnomalyScorer(features, seed).fit(train), features)
-    test_scores = artifacts.predict_proba(test)
-    metadata = {
+    model.fit(for_catboost(fit_set, features, cats), fit_set[Y], cat_features=cats)
+    artifacts = FraudArtifacts(model, AnomalyScorer(features, seed).fit(fit_set), features, cats)
+
+    artifacts.metadata = {
+        "dataset": spec.name,
+        "real_labels": spec.real_labels,
         "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "features": features,
-        "categorical_features": categorical_columns(features),
-        "excluded_sensitive_features": list(cfg.sensitive_features),
-        "train_years": list(cfg.train_years),
-        "test_years": list(cfg.test_years),
-        "n_train": len(train),
+        "categorical_features": cats,
+        "excluded_sensitive_features": list(spec.sensitive),
+        "n_fit": len(fit_set),
         "n_test": len(test),
         "n_trees": n_trees,
+        "catboost_params": CATBOOST_PARAMS,
         "seed": seed,
         "review_budget": cfg.review_budget,
         "data_sha256": data_sha256,
-        "test_metrics": {
-            "catboost": score_report(test[TARGET], test_scores, cfg.review_budget),
-            "isolation_forest": score_report(
-                test[TARGET], artifacts.anomaly.score(test), cfg.review_budget
-            ),
-        },
         "library_versions": {"catboost": catboost.__version__, "sklearn": sklearn.__version__},
+        "test_metrics": artifacts.test_metrics(test, cfg.review_budget) if final else None,
     }
-    artifacts.metadata = metadata
     return artifacts
 
 
@@ -104,7 +115,7 @@ def save(artifacts: FraudArtifacts, directory: Path | None = None) -> Path:
     digest = hashlib.sha256((directory / MODEL_FILE).read_bytes()).hexdigest()[:12]
     artifacts.metadata["version"] = f"catboost-{digest}"
     (directory / METADATA_FILE).write_text(
-        json.dumps(artifacts.metadata, indent=2), encoding="utf-8"
+        json.dumps(artifacts.metadata, indent=2, default=str), encoding="utf-8"
     )
     return directory
 
@@ -119,4 +130,10 @@ def load(directory: Path | None = None) -> FraudArtifacts:
     model = CatBoostClassifier()
     model.load_model(str(directory / MODEL_FILE))
     anomaly: AnomalyScorer = joblib.load(directory / ANOMALY_FILE)
-    return FraudArtifacts(model, anomaly, list(metadata["features"]), metadata)
+    return FraudArtifacts(
+        model,
+        anomaly,
+        list(metadata["features"]),
+        list(metadata["categorical_features"]),
+        metadata,
+    )

@@ -3,30 +3,33 @@
 #
 # A red flag is a reason to look closer, never proof of fraud. Weights are our own judgment of
 # how strongly each flag should raise attention; they are combined with a noisy-OR in [0, 1].
-# Fields use the tabular feature names, so the same rules run on Kaggle rows and synthetic claims.
-# Narrative-only flags (vague or shifting story, pressure for fast payment) are added in Step 4/5,
-# once intake extracts those facts.
+#
+# Fields use the shared rule vocabulary: the simulator's FNOL feature names. The real 1994–96 data
+# is translated into the same names where it can be (lines/auto/datasets.py: legacy_canonical);
+# rules it cannot express are reported as unchecked, not as "no red flag".
+# Honesty note: the same author wrote these rules and the simulator's fraud mechanisms, so the
+# simulator alone can't validate them. That's why the real-label report exists.
 
 name: auto_physical_damage_red_flags
-version: "1.0"
+version: "2.0"
 rules:
   - id: loss_soon_after_inception
     description: The loss happened within about two weeks of the policy starting.
     weight: 0.35
     all_of:
-      - {field: Days_Policy_Accident, op: in, value: ["none", "1 to 7", "8 to 15"]}
+      - {field: days_policy_to_loss, op: le, value: 15}
 
   - id: claim_soon_after_inception
     description: The claim was filed within about two weeks of the policy starting.
     weight: 0.30
     all_of:
-      - {field: Days_Policy_Claim, op: in, value: ["none", "1 to 7", "8 to 15"]}
+      - {field: days_policy_to_claim, op: le, value: 15}
 
   - id: recent_address_change
     description: The policyholder changed address within six months before the claim.
     weight: 0.35
     all_of:
-      - {field: AddressChange_Claim, op: eq, value: "under 6 months"}
+      - {field: address_change_days, op: le, value: 180}
 
   - id: unverified_at_fault_loss
     description: >-
@@ -34,29 +37,57 @@ rules:
       no police report and no witness.
     weight: 0.10
     all_of:
-      - {field: Fault, op: eq, value: "Policy Holder"}
-      - {field: PoliceReportFiled, op: eq, value: "No"}
-      - {field: WitnessPresent, op: eq, value: "No"}
+      - {field: at_fault, op: eq, value: 1}
+      - {field: police_report, op: eq, value: 0}
+      - {field: witness_count, op: eq, value: 0}
 
   - id: isolated_unverified_loss
     description: The loss happened in a rural area with no police report and no witness.
     weight: 0.15
     all_of:
-      - {field: AccidentArea, op: eq, value: "Rural"}
-      - {field: PoliceReportFiled, op: eq, value: "No"}
-      - {field: WitnessPresent, op: eq, value: "No"}
+      - {field: area, op: eq, value: rural}
+      - {field: police_report, op: eq, value: 0}
+      - {field: witness_count, op: eq, value: 0}
 
-  - id: expensive_older_vehicle
+  - id: claim_near_vehicle_value
     description: >-
-      A high-priced vehicle that is several years old, where the payout could exceed what
-      the car is really worth.
+      The amount claimed for a repairable loss is close to what the whole car is worth.
     weight: 0.15
     all_of:
-      - {field: VehiclePrice, op: eq, value: "more than 69000"}
-      - {field: AgeOfVehicle, op: in, value: ["6 years", "7 years", "more than 7"]}
+      - {field: claim_to_acv, op: ge, value: 0.6}
+      - {field: cause, op: not_in, value: [theft, fire]}
 
   - id: delayed_reporting
     description: The claim was reported roughly a month or more after the loss.
     weight: 0.20
     all_of:
-      - {field: claim_lag_weeks, op: ge, value: 4}
+      - {field: notice_days, op: ge, value: 28}
+
+  - id: late_night_unwitnessed_loss
+    description: The loss happened between midnight and 5 a.m. with no witness and no police report.
+    weight: 0.15
+    all_of:
+      - {field: loss_hour, op: in, value: [0, 1, 2, 3, 4]}
+      - {field: witness_count, op: eq, value: 0}
+      - {field: police_report, op: eq, value: 0}
+
+  - id: out_of_state_loss
+    description: The loss happened in a different state from where the policy is written.
+    weight: 0.10
+    all_of:
+      - {field: out_of_state, op: eq, value: 1}
+
+  - id: financed_theft_reported_late
+    description: A financed car was reported stolen to police a day or more after the loss.
+    weight: 0.30
+    all_of:
+      - {field: cause, op: eq, value: theft}
+      - {field: financed, op: eq, value: 1}
+      - {field: police_report_hours, op: ge, value: 24}
+
+  - id: early_attorney_on_injury_claim
+    description: An attorney is already involved in an injury claim at first notice.
+    weight: 0.15
+    all_of:
+      - {field: attorney_involved, op: eq, value: 1}
+      - {field: injury_count, op: ge, value: 1}

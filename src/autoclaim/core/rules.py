@@ -99,6 +99,24 @@ class RuleSet(BaseModel):
             out[rule.id] = mask
         return pd.DataFrame(out, index=df.index)
 
+    def unchecked(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Boolean frame (rows x rule ids): True where a rule *could still have fired* but a fact
+        it needs is missing. A rule already ruled out by a known-false condition (e.g. "cause is
+        theft" on a collision claim) is not unchecked: missing facts couldn't change its answer."""
+        out = {}
+        for rule in self.rules:
+            missing = pd.Series(False, index=df.index)
+            known_false = pd.Series(False, index=df.index)
+            for cond in rule.all_of:
+                if cond.field not in df.columns:
+                    missing |= True
+                    continue
+                absent = df[cond.field].isna()
+                missing |= absent
+                known_false |= ~absent & ~cond.mask(df)
+            out[rule.id] = missing & ~known_false
+        return pd.DataFrame(out, index=df.index)
+
     def missing_fields(self, columns: set[str]) -> dict[str, list[str]]:
         """Rule id -> fields it needs that are absent (those rules could not be checked)."""
         return {r.id: sorted(r.fields - columns) for r in self.rules if r.fields - columns}

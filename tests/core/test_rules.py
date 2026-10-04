@@ -142,3 +142,35 @@ def test_from_yaml(tmp_path: Path) -> None:
     )
     rs = RuleSet.from_yaml(path)
     assert rs.rules[0].fields == {"x"}
+
+
+def test_unchecked_per_row() -> None:
+    rs = RuleSet(
+        name="t",
+        version="1",
+        rules=[
+            _rule("needs_x", 0.5, {"field": "x", "op": "eq", "value": 1}),
+            _rule("needs_z", 0.5, {"field": "z", "op": "eq", "value": 1}),
+        ],
+    )
+    out = rs.unchecked(pd.DataFrame({"x": [1.0, np.nan]}))
+    assert out["needs_x"].tolist() == [False, True]  # missing value in row 2
+    assert out["needs_z"].tolist() == [True, True]  # column absent everywhere
+
+
+def test_rule_ruled_out_by_a_known_fact_is_not_unchecked() -> None:
+    rs = RuleSet(
+        name="t",
+        version="1",
+        rules=[
+            _rule(
+                "theft_late",
+                0.5,
+                {"field": "cause", "op": "eq", "value": "theft"},
+                {"field": "hours", "op": "ge", "value": 24},
+            )
+        ],
+    )
+    df = pd.DataFrame({"cause": ["collision", "theft", "theft"], "hours": [np.nan, np.nan, 30.0]})
+    # collision: known not theft -> checked; theft, hours unknown -> unchecked; all known -> checked
+    assert rs.unchecked(df)["theft_late"].tolist() == [False, True, False]

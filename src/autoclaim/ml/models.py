@@ -2,18 +2,18 @@
 
 All boosted models early-stop on ROC-AUC of the validation slice, the same for every model.
 Why not the alternatives (see docs/model_card.md, "Protocol history"):
-- PR-AUC is too noisy on ~160 validation frauds to pick a tree count.
-- Log-loss also scores calibration; the validation slice has a lower fraud rate than training
-  (drift), so log-loss worsens almost immediately and stopped models at ~12 trees.
+- PR-AUC is too noisy on a few hundred validation frauds to pick a tree count.
+- Log-loss also scores calibration; under base-rate drift it worsens almost immediately and
+  stopped models at ~12 trees.
 ROC-AUC is rank-based (how the model is used: ranking claims for review) and base-rate invariant.
 
-Each model receives cleaned frames plus the feature list, and does its own encoding:
-CatBoost uses native string categoricals, LightGBM/XGBoost use pandas `category` with a fixed
-vocabulary, logistic regression one-hot encodes, and EBM handles strings itself.
+Frames follow ml/frame.py (features + `y`). Categorical columns are inferred from dtypes at fit
+time and stored. CatBoost uses native string categoricals, LightGBM/XGBoost use pandas `category`
+with a fixed vocabulary, logistic regression one-hot encodes, and EBM handles strings itself.
 """
 
 from collections.abc import Callable, Sequence
-from typing import Any, Protocol
+from typing import Any
 
 import lightgbm as lgb
 import numpy as np
@@ -27,18 +27,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from autoclaim.ml.features import TARGET, CategoryVocab, categorical_columns, for_catboost
+from autoclaim.ml.frame import CategoryVocab, Y, categorical_columns, for_catboost
 
 EARLY_STOPPING_ROUNDS = 100
 MAX_TREES = 2000
-
-
-class FraudClassifier(Protocol):
-    name: str
-
-    def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "FraudClassifier": ...
-
-    def predict_proba(self, frame: pd.DataFrame) -> np.ndarray: ...
+# Chosen on validation (docs/model_card.md): depth 4 + stronger L2 matched depth 6 on recall
+# (+0.012, CI [-0.002, +0.023]) while cutting the train-validation PR-AUC gap 0.20 -> 0.13.
+CATBOOST_PARAMS: dict[str, Any] = {"learning_rate": 0.05, "depth": 4, "l2_leaf_reg": 10}
 
 
 class _Base:
@@ -47,8 +42,11 @@ class _Base:
 
     def __init__(self, features: Sequence[str], seed: int) -> None:
         self.features = list(features)
-        self.cats = categorical_columns(self.features)
         self.seed = seed
+        self.cats: list[str] = []
+
+    def _learn_types(self, train: pd.DataFrame) -> None:
+        self.cats = categorical_columns(train, self.features)
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "_Base":
         raise NotImplementedError
@@ -67,20 +65,22 @@ class CatBoostModel(_Base):
     needs_val = True
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "CatBoostModel":
+        self._learn_types(train)
         self.model = CatBoostClassifier(
             iterations=MAX_TREES,
-            learning_rate=0.05,
-            depth=6,
+            **CATBOOST_PARAMS,
             eval_metric="AUC",
             random_seed=self.seed,
             verbose=0,
             allow_writing_files=False,
             thread_count=-1,
         )
-        eval_set = None if val is None else (for_catboost(val, self.features), val[TARGET])
+        eval_set = None
+        if val is not None:
+            eval_set = (for_catboost(val, self.features, self.cats), val[Y])
         self.model.fit(
-            for_catboost(train, self.features),
-            train[TARGET],
+            for_catboost(train, self.features, self.cats),
+            train[Y],
             cat_features=self.cats,
             eval_set=eval_set,
             early_stopping_rounds=EARLY_STOPPING_ROUNDS if val is not None else None,
@@ -88,7 +88,8 @@ class CatBoostModel(_Base):
         return self
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
-        proba: np.ndarray = self.model.predict_proba(for_catboost(frame, self.features))[:, 1]
+        x = for_catboost(frame, self.features, self.cats)
+        proba: np.ndarray = self.model.predict_proba(x)[:, 1]
         return proba
 
     @property
@@ -101,7 +102,8 @@ class LightGBMModel(_Base):
     needs_val = True
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "LightGBMModel":
-        self.vocab = CategoryVocab.fit(train, self.features)
+        self._learn_types(train)
+        self.vocab = CategoryVocab.fit(train, self.cats)
         self.model = lgb.LGBMClassifier(
             n_estimators=MAX_TREES,
             learning_rate=0.03,
@@ -117,10 +119,10 @@ class LightGBMModel(_Base):
         kwargs: dict[str, Any] = {}
         if val is not None:
             kwargs = {
-                "eval_set": [(self.vocab.transform(val, self.features), val[TARGET])],
+                "eval_set": [(self.vocab.transform(val, self.features), val[Y])],
                 "callbacks": [lgb.early_stopping(EARLY_STOPPING_ROUNDS, verbose=False)],
             }
-        self.model.fit(self.vocab.transform(train, self.features), train[TARGET], **kwargs)
+        self.model.fit(self.vocab.transform(train, self.features), train[Y], **kwargs)
         return self
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
@@ -138,7 +140,8 @@ class XGBoostModel(_Base):
     needs_val = True
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "XGBoostModel":
-        self.vocab = CategoryVocab.fit(train, self.features)
+        self._learn_types(train)
+        self.vocab = CategoryVocab.fit(train, self.cats)
         self.model = xgb.XGBClassifier(
             n_estimators=MAX_TREES,
             learning_rate=0.03,
@@ -153,12 +156,9 @@ class XGBoostModel(_Base):
         )
         eval_set = None
         if val is not None:
-            eval_set = [(self.vocab.transform(val, self.features), val[TARGET])]
+            eval_set = [(self.vocab.transform(val, self.features), val[Y])]
         self.model.fit(
-            self.vocab.transform(train, self.features),
-            train[TARGET],
-            eval_set=eval_set,
-            verbose=False,
+            self.vocab.transform(train, self.features), train[Y], eval_set=eval_set, verbose=False
         )
         return self
 
@@ -176,6 +176,7 @@ class LogisticModel(_Base):
     name = "logistic"
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "LogisticModel":
+        self._learn_types(train)
         numeric = [c for c in self.features if c not in self.cats]
         pre = ColumnTransformer(
             [
@@ -196,30 +197,38 @@ class LogisticModel(_Base):
                 ("clf", LogisticRegression(C=1.0, class_weight="balanced", max_iter=5000)),
             ]
         )
-        self.model.fit(self._as_object(train), train[TARGET])
+        self.model.fit(self._as_typed(train), train[Y])
         return self
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
-        proba: np.ndarray = self.model.predict_proba(self._as_object(frame))[:, 1]
+        proba: np.ndarray = self.model.predict_proba(self._as_typed(frame))[:, 1]
         return proba
 
-    def _as_object(self, frame: pd.DataFrame) -> pd.DataFrame:
-        return frame[self.features].astype({c: "object" for c in self.cats})
+    def _as_typed(self, frame: pd.DataFrame) -> pd.DataFrame:
+        out = frame[self.features].copy()
+        for c in self.features:
+            if c in self.cats:
+                out[c] = out[c].astype("object")
+            else:
+                out[c] = pd.to_numeric(out[c], errors="coerce").astype("float64")
+        return out
 
 
 class EBMModel(_Base):
     name = "ebm"
 
     def fit(self, train: pd.DataFrame, val: pd.DataFrame | None) -> "EBMModel":
+        self._learn_types(train)
         types = ["nominal" if c in self.cats else "continuous" for c in self.features]
         self.model = ExplainableBoostingClassifier(
             feature_types=types, outer_bags=8, random_state=self.seed, n_jobs=-1
         )
-        self.model.fit(for_catboost(train, self.features), train[TARGET])
+        self.model.fit(for_catboost(train, self.features, self.cats), train[Y])
         return self
 
     def predict_proba(self, frame: pd.DataFrame) -> np.ndarray:
-        proba: np.ndarray = self.model.predict_proba(for_catboost(frame, self.features))[:, 1]
+        x = for_catboost(frame, self.features, self.cats)
+        proba: np.ndarray = self.model.predict_proba(x)[:, 1]
         return proba
 
 
