@@ -1,0 +1,40 @@
+# --- Project: never commit data, weights, indexes, secrets, caches ---
+data/
+models/
+.env
+.env.*
+!.env.example
+.cache/
+*.faiss
+*.cbm
+*.joblib
+*.pkl
+checkpoints/
+*.sqlite
+*.db
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# --- Tooling ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Claude Code (keep shared settings.json, ignore personal overrides) ---
+.claude/settings.local.json
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

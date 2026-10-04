@@ -1,0 +1,37 @@
+# Everything company-specific lives here. Swap this file to support another carrier.
+# Sections are filled in as the steps that use them land; values marked TBD are set later.
+
+carrier:
+  name: Demo Mutual Insurance (fictional)
+  line_of_business: auto
+
+retrieval:
+  # FAISS HNSW (IndexHNSWFlat, inner product on L2-normalized vectors = cosine)
+  hnsw:
+    M: 32
+    ef_construction: 200
+    ef_search: 64
+
+harness:
+  max_retries: 2          # critic/judge -> adjudicator retry loop
+  seed: 42
+
+# Step 3: deductibles per coverage (collision vs. comprehensive)
+deductibles: {}
+
+# Step 5: routing thresholds (confidence, fraud risk, auto-approval authority limit)
+router: {}
+
+# Step 5: per-claim budget caps (tokens, cost USD, steps)
+budgets: {}
+
+# Step 4+: model per role, all free (Groq / Google AI Studio free tiers, Ollama local fallback).
+# Judge must be a different model (ideally a different family) from the adjudicator.
+models:
+  providers: [groq, google, ollama]   # fallback order is set per role in Step 4
+  intake: TBD
+  coverage: TBD
+  fraud: TBD
+  adjudicator: TBD
+  judge: TBD
+  synthetic_generator: TBD
