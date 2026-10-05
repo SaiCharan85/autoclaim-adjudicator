@@ -44,5 +44,5 @@ Does an LLM add value to fraud triage at first notice of loss, on its own or com
 - An LLM arm "adds value" only if its ROC-AUC beats **ml** with a paired 95% CI that excludes zero.
 - The harness's fraud node uses the hybrid design only if hybrid beats ml by that rule. Otherwise the
   fraud number stays the ML score, and the LLM only writes the explanation around it. That is the
-  CLAUDE.md principle "tool numbers win".
+  design principle "tool numbers win".
 - Prompts may change after the pilot. Once the 200-claim validation run starts, they are frozen.

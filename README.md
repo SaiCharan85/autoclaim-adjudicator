@@ -54,7 +54,7 @@ flowchart LR
 
 ## Status
 
-See the step plan in [CLAUDE.md](CLAUDE.md). Setup, results, and demo instructions will be added as steps land.
+Work in progress. Setup, results, and demo instructions will be added as the project lands.
 
 ## Data
 

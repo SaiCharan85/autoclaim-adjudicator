@@ -31,8 +31,9 @@ venv/
 htmlcov/
 .ipynb_checkpoints/
 
-# --- Claude Code (keep shared settings.json, ignore personal overrides) ---
+# --- Claude Code (keep shared settings.json; local notes and overrides stay untracked) ---
 .claude/settings.local.json
+CLAUDE.md
 
 # --- OS / editors ---
 .DS_Store
