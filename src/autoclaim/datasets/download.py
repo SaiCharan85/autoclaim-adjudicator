@@ -22,6 +22,7 @@ from autoclaim.datasets.sources import SOURCES, URL_SOURCES, DatasetSource, UrlS
 from autoclaim.paths import raw_dir
 
 MANIFEST_NAME = "manifest.json"
+BLS_KEY = "bls_cpi"  # BLS price indexes (datasets/bls.py), fetched from the public API
 KAGGLE_METADATA_NAME = "dataset-metadata.json"
 
 
@@ -189,6 +190,7 @@ def download_url(
         fetch(source.url, archive)
         archive_digest = sha256_file(archive)
         missing = extract_members(archive, source.files, dest)
+        extract_members(archive, source.optional_files, dest)  # absent ones are fine
     finally:
         archive.unlink(missing_ok=True)
     if missing:
@@ -198,7 +200,11 @@ def download_url(
         source_key=source.key,
         url=source.url,
         archive_sha256=archive_digest,
-        files={name: sha256_file(dest / name) for name in source.files},
+        files={
+            name: sha256_file(dest / name)
+            for name in (*source.files, *(o.lower() for o in source.optional_files))
+            if (dest / name).exists()
+        },
         licenses=[source.license],
         title=source.description,
         downloaded_at=datetime.now(UTC).isoformat(timespec="seconds"),
@@ -212,7 +218,7 @@ def main(
     api_factory: Callable[[], KaggleApiLike] = default_api,
     fetch: Fetcher = default_fetch,
 ) -> int:
-    known = [*SOURCES, *URL_SOURCES]
+    known = [*SOURCES, *URL_SOURCES, BLS_KEY]
     parser = argparse.ArgumentParser(description="Download datasets into data/raw/.")
     # no argparse `choices`: it rejects list defaults with nargs="*"
     parser.add_argument("sources", nargs="*", help=f"default: all ({', '.join(known)})")
@@ -227,6 +233,12 @@ def main(
 
     load_dotenv()
     for key in keys:
+        if key == BLS_KEY:
+            from autoclaim.datasets import bls
+
+            path = bls.download_cpi(raw_dir(key))
+            print(f"[{key}] downloaded: {path.name} | license: {bls.LICENSE}")
+            continue
         if key in URL_SOURCES:
             manifest, downloaded = download_url(
                 URL_SOURCES[key], raw_dir(key), fetch, force=args.force

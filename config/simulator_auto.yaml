@@ -56,7 +56,7 @@ driver_age: {min: 16, max: 90, mean: 44, sd: 16}
 # Vehicles (2023–2026 market; assumed)
 vehicle_age_years: {mean: 9, sd: 5, max: 25}        # only when the real model year is unknown
 new_vehicle_price: {median: 42000, sigma: 0.25}     # lognormal noise around body_new_price
-depreciation_per_year: 0.12
+depreciation_per_year: 0.15   # calibrated 2026-10-04 (was 0.12; docs/calibration.md)
 min_acv: 1500
 financed_rate_by_age: {new_max_age: 5, new: 0.70, old: 0.20}
 adas_rate_by_age: {new_max_age: 6, new: 0.85, old: 0.25}
@@ -70,30 +70,34 @@ loss_causes:
   collision_object: 0.10
   parked_hit: 0.08
   animal: 0.07
-  theft: 0.05
+  theft: 0.03
   vandalism: 0.04
   hail_weather: 0.07
-  glass: 0.15
+  glass: 0.17
   fire: 0.01
   hit_and_run: 0.05
   mechanical_breakdown: 0.02
 # Seasonality comes from the real crash dates (e.g. deer strikes peak Oct–Dec in CRSS).
 use_at_loss: {personal: 0.81, commute: 0.17, rideshare_active: 0.01, delivery_active: 0.01}
 
-# Damage (fraction of ACV) by cause; lognormal median, sigma (assumed)
+# Damage (fraction of ACV) by cause; lognormal median, sigma. Calibrated 2026-10-04 to real 2024
+# severities and total-loss share (scripts/calibrate_world.py, docs/calibration.md).
 damage_fraction:
-  collision_vehicle: [0.18, 0.8]
-  collision_object: [0.15, 0.8]
-  parked_hit: [0.07, 0.7]
-  animal: [0.15, 0.7]
-  theft: [1.0, 0.0]          # total loss of the vehicle
-  vandalism: [0.05, 0.8]
-  hail_weather: [0.10, 0.7]
-  glass: [0.03, 0.5]
-  fire: [0.60, 0.6]
-  hit_and_run: [0.12, 0.8]
+  collision_vehicle: [0.252, 1.25]
+  collision_object: [0.21, 1.25]
+  parked_hit: [0.098, 1.15]
+  animal: [0.105, 0.7]
+  theft: [1, 0]          # unrecovered theft = total loss (recovered: see theft_recovery)
+  vandalism: [0.035, 0.8]
+  hail_weather: [0.07, 0.7]
+  glass: [0.021, 0.5]
+  fire: [0.42, 0.6]
+  hit_and_run: [0.168, 1.25]
   mechanical_breakdown: [0.08, 0.6]
 adas_glass_recalibration_usd: 450   # total-loss threshold lives in the jurisdiction profile
+# About half of stolen vehicles are recovered (public theft reports put recovery near half;
+# assumed value); a recovered car is repaired, not written off.
+theft_recovery: {rate: 0.5, damage_fraction: [0.20, 0.8]}
 
 # Share of each cause that is police-reported. For causes CRSS covers, that share of claims IS a
 # real crash record; the rest are simulated unreported claims. (assumed rates)
@@ -111,12 +115,13 @@ police_report_rate:
   mechanical_breakdown: 0.0   # a breakdown is not a crash
 police_report_hours: {median: 2, sigma: 1.2}     # lognormal hours after the loss
 witness_rate: {collision_vehicle: 0.45, collision_object: 0.20, parked_hit: 0.15, default: 0.10}
-# Repair cost as a fraction of vehicle value, by REAL police-reported damage extent (assumed)
+# Repair cost as a fraction of vehicle value, by REAL police-reported damage extent (calibrated
+# 2026-10-04, docs/calibration.md)
 damage_by_extent:
-  none: [0.02, 0.5]
-  minor: [0.06, 0.6]
-  functional: [0.18, 0.6]
-  disabling: [0.55, 0.5]
+  none: [0.028, 0.95]
+  minor: [0.084, 1.05]
+  functional: [0.252, 1.05]
+  disabling: [0.77, 0.95]
 towed_damage_multiplier: 1.4
 body_new_price: {car: 34000, suv: 44000, pickup: 52000, van: 42000, light_unknown: 40000}
 luxury_makes: [BMW, Mercedes-Benz, Audi, Lexus, Tesla, Porsche, Cadillac, Lincoln, Volvo,
@@ -146,6 +151,19 @@ fraud:
   late_notice_share: 0.35          # prior_damage / give-up report late more often
   address_change_recent_share: 0.10
   legit_address_change_recent_share: 0.01
+
+# Independent appraisal (post-FNOL): a staff/desk/photo appraiser estimates the repair cost
+# before payment. Appraisers tend to come in a little under the shop (hidden damage shows up
+# later) and are noisy (assumed). A theft has no vehicle to appraise: valued at ACV. Drawn from its
+# own random stream, so adding it changes no other column.
+appraisal:
+  log_bias: -0.05                  # appraised = true damage x exp(N(log_bias, hypot(sigma, shop_sigma)))
+  sigma: 0.20                      # appraiser's own estimating error
+  shop_sigma: 0.18                 # honest shop-estimate error (assumed); honest claims file at true damage,
+                                   # so it is folded into the shop-vs-appraiser gap here (keeps the 0.9 canary honest)
+  prior_damage_detect: 0.50        # appraiser notes old, unrelated damage on a prior-damage fraud
+  prior_damage_false_flag: 0.02    # ... or wrongly on a legitimate claim
+  seed_offset: 7
 
 # Six coverage traps planted at these rates (enriched above real-world frequency so evals see them)
 traps:

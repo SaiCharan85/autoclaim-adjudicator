@@ -109,8 +109,9 @@ def test_build_all_attaches_ground_truth(built: dict[str, pd.DataFrame]) -> None
 
 
 def test_shift_holdout_uses_overrides(built: dict[str, pd.DataFrame]) -> None:
-    liab = {k: (v["coverage"] == "liability_only").mean() for k, v in built.items()}
-    assert liab["holdout_shift"] > liab["holdout_fresh"]
+    # shift moves no-comprehensive policies 17% -> 28%: big enough to see on 300 claims
+    no_comp = {k: (v["coverage"] != "collision_comprehensive").mean() for k, v in built.items()}
+    assert no_comp["holdout_shift"] > no_comp["holdout_fresh"]
 
 
 def test_write_and_load_round_trip(built: dict[str, pd.DataFrame], tmp_path: Path) -> None:
@@ -126,3 +127,14 @@ def test_write_and_load_round_trip(built: dict[str, pd.DataFrame], tmp_path: Pat
 def test_load_missing_gives_hint(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match=r"simulate_claims\.py"):
         build.load("claims", tmp_path)
+
+
+def test_stage_features_allow_appraisal_only_at_stage_two() -> None:
+    columns.assert_stage_features(["cause", "log_claim_to_appraisal"], "appraisal")
+    columns.assert_stage_features(["cause"], "fnol")
+    with pytest.raises(columns.LeakageError, match="appraisal"):
+        columns.assert_stage_features(["appraised_amount"], "fnol")
+    with pytest.raises(columns.LeakageError):
+        columns.assert_stage_features(["fraud_confirmed"], "appraisal")
+    with pytest.raises(columns.LeakageError):
+        columns.assert_fnol_only(["appraiser_prior_damage"])

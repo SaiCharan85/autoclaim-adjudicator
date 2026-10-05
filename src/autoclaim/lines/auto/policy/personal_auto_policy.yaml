@@ -1,0 +1,1044 @@
+# Demo Mutual Insurance - fictional carrier. Personal auto policy, physical damage part only
+# (Collision + Other Than Collision / "comprehensive") plus the definitions, conditions and
+# general provisions it depends on. Every clause is written in our own plain-English words for
+# this project. It is NOT a copy or paraphrase of any ISO form or any real insurer's policy.
+# Jurisdiction: US. Edges are directed from the clause to the target (see retrieval docs).
+policy:
+  id: demo_personal_auto_pd
+  name: Demo Mutual Personal Auto Policy - Physical Damage
+  version: "1.0"
+  jurisdiction: US
+clauses:
+  # ------------------------------------------------------------------ declarations
+  - id: DEC-DECLARATIONS
+    section: declarations
+    title: What the declarations page shows
+    text: >-
+      The declarations page is the summary sheet issued with this policy. It names you, lists
+      each vehicle we insure, shows which coverages you bought for each vehicle and the premium
+      charged, states the collision deductible and the comprehensive deductible, lists drivers in
+      your household and any drivers we have excluded by name, and lists any endorsements and loss
+      payees. A coverage applies to a vehicle only if the declarations show a premium for it.
+    edges:
+      - {type: see_also, target: DEC-LIABILITY-ONLY}
+      - {type: see_also, target: DEC-DEDUCTIBLES}
+      - {type: see_also, target: DEC-LISTED-DRIVERS}
+      - {type: uses_term, target: DEF-YOU}
+
+  - id: DEC-LIABILITY-ONLY
+    section: declarations
+    title: Liability-only vehicles have no physical damage coverage
+    text: >-
+      If the declarations show liability coverage only for a vehicle, with no premium for
+      Collision and no premium for Other Than Collision, then this physical damage part gives no
+      protection for damage to or theft of that vehicle, whatever the cause. In that case we pay
+      nothing for repairs, replacement, glass, towing or rental for that vehicle, although
+      liability protection for injury or damage you cause to others is unaffected.
+    edges:
+      - {type: see_also, target: DEC-DECLARATIONS}
+      - {type: see_also, target: INS-PHYSICAL-DAMAGE}
+
+  - id: DEC-DEDUCTIBLES
+    section: declarations
+    title: Separate collision and comprehensive deductibles
+    text: >-
+      The declarations show two separate deductible amounts: one for Collision losses and one for
+      Other Than Collision (comprehensive) losses. They may differ, for example $500 for collision
+      and $250 for comprehensive. The deductible that applies to a claim is the one for the
+      coverage that pays the loss, not the larger or smaller of the two. If a coverage is not
+      purchased, its deductible line is blank.
+    edges:
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: see_also, target: LIM-DEDUCTIBLE}
+
+  - id: DEC-LISTED-DRIVERS
+    section: declarations
+    title: Listed drivers are for rating, not a limit on who may drive
+    text: >-
+      We ask you to list every licensed driver in your household and regular operators of your
+      vehicles so that we can price the policy correctly. Listing drivers is rating information. It
+      does not restrict coverage to listed drivers only. A person who is not listed but drives your
+      covered auto with permission is still an insured. The only drivers who are shut out are those
+      named as excluded drivers on the declarations.
+    edges:
+      - {type: see_also, target: INS-PERMISSIVE-USE}
+      - {type: see_also, target: EXC-EXCLUDED-DRIVER}
+      - {type: uses_term, target: DEF-PERMISSIVE-USER}
+
+  # ------------------------------------------------------------------ definitions
+  - id: DEF-YOU
+    section: definitions
+    title: You, your, we, us, our
+    text: >-
+      "You" and "your" mean the named insured shown on the declarations and that person's spouse or
+      registered domestic partner if living in the same household. If the spouse moves out, they
+      remain "you" until the earlier of 90 days, the policy end date, or the date they get their
+      own policy. "We", "us" and "our" mean Demo Mutual Insurance, the company issuing this policy.
+    edges:
+      - {type: see_also, target: DEF-FAMILY-MEMBER}
+
+  - id: DEF-INSURED
+    section: definitions
+    title: Insured (physical damage)
+    text: >-
+      For this physical damage part, "insured" means you, any family member, and any other person
+      using your covered auto with your permission or the permission of a family member, as long as
+      the person is not named as an excluded driver. A person is an insured only while their use is
+      within the scope of the permission given.
+    edges:
+      - {type: uses_term, target: DEF-YOU}
+      - {type: uses_term, target: DEF-FAMILY-MEMBER}
+      - {type: uses_term, target: DEF-PERMISSIVE-USER}
+      - {type: uses_term, target: DEF-EXCLUDED-DRIVER}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+
+  - id: DEF-FAMILY-MEMBER
+    section: definitions
+    title: Family member
+    text: >-
+      "Family member" means a person related to you by blood, marriage, domestic partnership or
+      adoption who lives in your household, including a ward or foster child. A child away at school
+      who still treats your home as their permanent residence counts as a family member. Relatives
+      who live elsewhere are not family members, but may still be insureds as permissive users.
+    edges:
+      - {type: uses_term, target: DEF-YOU}
+      - {type: see_also, target: DEF-PERMISSIVE-USER}
+
+  - id: DEF-YOUR-COVERED-AUTO
+    section: definitions
+    title: Your covered auto
+    text: >-
+      "Your covered auto" means: (1) any vehicle listed on the declarations; (2) a newly acquired
+      auto that meets the conditions in its definition; (3) a trailer you own; and (4) a temporary
+      substitute auto. Physical damage coverage applies to a listed vehicle only if the declarations
+      show a premium for Collision or Other Than Collision on that vehicle.
+    edges:
+      - {type: uses_term, target: DEF-NEWLY-ACQUIRED-AUTO}
+      - {type: uses_term, target: DEF-TEMPORARY-SUBSTITUTE-AUTO}
+      - {type: see_also, target: DEC-LIABILITY-ONLY}
+
+  - id: DEF-NEWLY-ACQUIRED-AUTO
+    section: definitions
+    title: Newly acquired auto
+    text: >-
+      A "newly acquired auto" is a private passenger car, pickup or van you become the owner of
+      during the policy period. If it replaces a vehicle on the declarations, it gets the same
+      physical damage coverage as the vehicle it replaced. If it is an additional vehicle, physical
+      damage coverage applies only if you ask us to add it within 14 days after you become the owner;
+      the vehicle-specific deductible is then the highest one shown on the declarations.
+    edges:
+      - {type: see_also, target: DEF-YOUR-COVERED-AUTO}
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+
+  - id: DEF-TEMPORARY-SUBSTITUTE-AUTO
+    section: definitions
+    title: Temporary substitute auto
+    text: >-
+      A "temporary substitute auto" is a vehicle you do not own that you use with the owner's
+      permission while your covered auto cannot be used because it is being repaired or serviced,
+      has broken down, was stolen, or was destroyed. It is treated as your covered auto only for as
+      long as your own vehicle is out of use for one of those reasons.
+    edges:
+      - {type: see_also, target: DEF-YOUR-COVERED-AUTO}
+      - {type: see_also, target: DEF-NON-OWNED-AUTO}
+
+  - id: DEF-NON-OWNED-AUTO
+    section: definitions
+    title: Non-owned auto
+    text: >-
+      A "non-owned auto" is a private passenger car, pickup, van or trailer that is not owned by,
+      and not furnished or available for the regular use of, you or a family member, while it is
+      being driven by or in the custody of you or a family member. A borrowed car from a friend or
+      a short-term rental car qualifies. A company car provided for your regular use does not.
+    edges:
+      - {type: uses_term, target: DEF-FAMILY-MEMBER}
+      - {type: see_also, target: DEF-TEMPORARY-SUBSTITUTE-AUTO}
+
+  - id: DEF-COLLISION
+    section: definitions
+    title: Collision
+    text: >-
+      "Collision" means your covered auto or a non-owned auto striking, or being struck by, another
+      vehicle or an object, or overturning (rollover). Being hit by another car while parked is a
+      collision. Contact with an animal or bird is NOT a collision; it is an Other Than Collision
+      (comprehensive) loss, even when the animal runs into the road and strikes the front of the car.
+      Swerving to avoid an animal and then hitting a tree or guardrail is a collision.
+    edges:
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: uses_term, target: DEF-NON-OWNED-AUTO}
+      - {type: see_also, target: DEF-OTHER-THAN-COLLISION}
+
+  - id: DEF-OTHER-THAN-COLLISION
+    section: definitions
+    title: Other Than Collision (comprehensive)
+    text: >-
+      "Other Than Collision", often called comprehensive, means direct and accidental loss that is
+      not a collision. It includes: contact with an animal or bird; theft or larceny; vandalism or
+      malicious mischief; fire, lightning or explosion; hail, windstorm, flood, earthquake and other
+      weather; falling objects or missiles; riot or civil commotion; and breakage of glass.
+    edges:
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: uses_term, target: DEF-LOSS}
+
+  - id: DEF-LOSS
+    section: definitions
+    title: Loss
+    text: >-
+      "Loss" means direct and accidental physical damage to, or theft of, your covered auto or a
+      non-owned auto, including its permanently attached equipment. Loss does not include indirect
+      or consequential harm such as loss of use, reduced resale value, or the cost of replacing
+      items merely carried in the vehicle, except where this policy expressly says otherwise.
+    edges:
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: uses_term, target: DEF-NON-OWNED-AUTO}
+      - {type: see_also, target: EXC-DIMINUTION-IN-VALUE}
+
+  - id: DEF-ACTUAL-CASH-VALUE
+    section: definitions
+    title: Actual cash value
+    text: >-
+      "Actual cash value" (ACV) means what it would cost to buy a vehicle of the same make, model,
+      year, mileage, options and condition in the local market just before the loss. It reflects
+      depreciation, prior damage and wear. ACV is usually set from comparable vehicles for sale or
+      recognized valuation sources, and is not the price you paid or the balance owed on any loan.
+    edges:
+      - {type: see_also, target: LIM-LIMIT-OF-LIABILITY}
+
+  - id: DEF-DEDUCTIBLE
+    section: definitions
+    title: Deductible
+    text: >-
+      The "deductible" is the part of each covered loss that you pay yourself. We subtract it from
+      the amount we would otherwise pay. The collision deductible applies to collision losses and
+      the comprehensive deductible applies to Other Than Collision losses; both amounts are shown on
+      the declarations. A separate deductible applies to each separate occurrence.
+    edges:
+      - {type: see_also, target: DEC-DEDUCTIBLES}
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: uses_term, target: DEF-OTHER-THAN-COLLISION}
+
+  - id: DEF-TOTAL-LOSS
+    section: definitions
+    title: Total loss
+    text: >-
+      A vehicle is a "total loss" when the reasonable cost to repair it, including parts, labor,
+      sensor recalibration and taxes, equals or exceeds 75 percent of its actual cash value just
+      before the loss, or when a stolen vehicle is not recovered within 30 days after the theft is
+      reported to us. Some states set a different threshold; where they do, the state rule controls.
+    edges:
+      - {type: uses_term, target: DEF-ACTUAL-CASH-VALUE}
+      - {type: see_also, target: LIM-TOTAL-LOSS}
+
+  - id: DEF-PERMISSIVE-USER
+    section: definitions
+    title: Permissive user
+    text: >-
+      A "permissive user" is a person who is not you or a family member and who drives your covered
+      auto with your express or implied permission, for example a friend who borrows the car or a
+      relative visiting from out of town. Permission may be given by you or a family member. A
+      permissive user need not be listed on the declarations.
+    edges:
+      - {type: uses_term, target: DEF-FAMILY-MEMBER}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: see_also, target: INS-PERMISSIVE-USE}
+
+  - id: DEF-EXCLUDED-DRIVER
+    section: definitions
+    title: Excluded driver
+    text: >-
+      An "excluded driver" is a person whom you and we agreed, in a signed named driver exclusion
+      shown on the declarations, will not be covered. Exclusion usually follows a poor driving
+      record. An excluded driver is never an insured and can never be a permissive user, even if
+      you gave them the keys or the use was an emergency.
+    edges:
+      - {type: see_also, target: EXC-EXCLUDED-DRIVER}
+      - {type: see_also, target: DEC-DECLARATIONS}
+
+  - id: DEF-TNC-ACTIVITY
+    section: definitions
+    title: Transportation network and delivery activity
+    text: >-
+      "Transportation network activity" means the time a driver is logged into a ride-hailing app
+      (such as a rideshare platform) and available for or waiting on a ride request, travelling to
+      pick up a passenger, or carrying a passenger. "Delivery activity" means the same periods while
+      logged into an app that dispatches food, grocery or package deliveries. Either period ends
+      when the driver logs out of the app.
+    edges:
+      - {type: see_also, target: EXC-COMMERCIAL-USE}
+      - {type: see_also, target: END-RIDESHARE}
+
+  - id: DEF-HIT-AND-RUN-VEHICLE
+    section: definitions
+    title: Hit-and-run vehicle
+    text: >-
+      A "hit-and-run vehicle" is a land motor vehicle whose driver and owner cannot be identified
+      and which strikes your covered auto, or strikes another vehicle that then strikes your covered
+      auto, and leaves the scene. A parked car found damaged with no note left by the other driver
+      is treated as struck by a hit-and-run vehicle.
+    edges:
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: see_also, target: INS-HIT-AND-RUN}
+
+  - id: DEF-CUSTOM-EQUIPMENT
+    section: definitions
+    title: Custom equipment
+    text: >-
+      "Custom equipment" means permanently installed parts, equipment and finishes that were not
+      offered by the vehicle maker for that model as factory or dealer options. Examples include
+      aftermarket wheels, lift kits, custom paint or wraps, body kits, upgraded audio systems and
+      aftermarket lighting. Ordinary replacement parts of like kind are not custom equipment.
+    edges:
+      - {type: see_also, target: EXC-CUSTOM-EQUIPMENT}
+
+  - id: DEF-ADAS
+    section: definitions
+    title: Advanced driver assistance systems
+    text: >-
+      "Advanced driver assistance systems" (ADAS) means factory-installed cameras, radar, lidar and
+      ultrasonic sensors and their control modules that support features such as automatic emergency
+      braking, lane keeping, adaptive cruise control and blind-spot warning. These are part of the
+      vehicle's permanently installed equipment, often mounted in the windshield, bumpers or mirrors.
+    edges:
+      - {type: see_also, target: LIM-ADAS-RECALIBRATION}
+
+  # ------------------------------------------------------------------ insuring agreements
+  - id: INS-PHYSICAL-DAMAGE
+    section: insuring_agreement
+    title: Physical damage - general promise
+    text: >-
+      We will pay for direct and accidental loss to your covered auto or any non-owned auto,
+      including its permanently installed equipment, minus the applicable deductible. Payment is
+      made under Collision only if the declarations show a Collision premium for that vehicle, and
+      under Other Than Collision only if they show an Other Than Collision premium. Which coverage
+      pays depends on whether the loss was a collision.
+    edges:
+      - {type: uses_term, target: DEF-LOSS}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: uses_term, target: DEF-NON-OWNED-AUTO}
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: see_also, target: INS-COLLISION}
+      - {type: see_also, target: INS-COMPREHENSIVE}
+      - {type: subject_to, target: DEC-LIABILITY-ONLY}
+      - {type: subject_to, target: LIM-LIMIT-OF-LIABILITY}
+      - {type: subject_to, target: EXC-EXCLUDED-DRIVER}
+      - {type: subject_to, target: GEN-FRAUD}
+      - {type: subject_to, target: GEN-POLICY-PERIOD}
+      - {type: subject_to, target: GEN-POLICY-TERRITORY}
+
+  - id: INS-COLLISION
+    section: insuring_agreement
+    title: Collision coverage
+    text: >-
+      If the declarations show Collision coverage, we will pay for loss to your covered auto or a
+      non-owned auto caused by collision, including striking another vehicle, a pole, wall, curb,
+      guardrail or other object, rolling over, or being struck by another vehicle while moving or
+      parked. We pay regardless of who was at fault, minus the collision deductible, and may then
+      seek recovery from a responsible party.
+    edges:
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: uses_term, target: DEF-NON-OWNED-AUTO}
+      - {type: uses_term, target: DEF-LOSS}
+      - {type: subject_to, target: LIM-DEDUCTIBLE}
+      - {type: subject_to, target: LIM-LIMIT-OF-LIABILITY}
+      - {type: subject_to, target: LIM-LOSS-BELOW-DEDUCTIBLE}
+      - {type: subject_to, target: LIM-TOTAL-LOSS}
+      - {type: subject_to, target: DEC-LIABILITY-ONLY}
+      - {type: subject_to, target: EXC-EXCLUDED-DRIVER}
+      - {type: subject_to, target: EXC-COMMERCIAL-USE}
+      - {type: subject_to, target: EXC-INTENTIONAL-DAMAGE}
+      - {type: subject_to, target: EXC-RACING}
+      - {type: subject_to, target: EXC-WEAR-AND-TEAR}
+      - {type: subject_to, target: EXC-MECHANICAL-BREAKDOWN}
+      - {type: subject_to, target: EXC-ROAD-DAMAGE-TIRES}
+      - {type: subject_to, target: EXC-NO-REASONABLE-BELIEF}
+      - {type: subject_to, target: COND-NOTICE-OF-LOSS}
+      - {type: subject_to, target: COND-COOPERATION}
+      - {type: subject_to, target: GEN-FRAUD}
+      - {type: see_also, target: INS-HIT-AND-RUN}
+      - {type: see_also, target: INS-GLASS-BREAKAGE}
+      - {type: see_also, target: COND-SUBROGATION}
+
+  - id: INS-COMPREHENSIVE
+    section: insuring_agreement
+    title: Other Than Collision (comprehensive) coverage
+    text: >-
+      If the declarations show Other Than Collision coverage, we will pay for loss to your covered
+      auto or a non-owned auto that is not caused by collision. This includes hitting or being hit by
+      a deer or other animal, theft of the vehicle or its parts, vandalism such as keying or broken
+      windows, fire, hail, windstorm, flood, falling objects and glass breakage. We pay minus the
+      comprehensive deductible.
+    edges:
+      - {type: uses_term, target: DEF-OTHER-THAN-COLLISION}
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: uses_term, target: DEF-LOSS}
+      - {type: subject_to, target: LIM-DEDUCTIBLE}
+      - {type: subject_to, target: LIM-LIMIT-OF-LIABILITY}
+      - {type: subject_to, target: LIM-LOSS-BELOW-DEDUCTIBLE}
+      - {type: subject_to, target: LIM-TOTAL-LOSS}
+      - {type: subject_to, target: LIM-GLASS-REPAIR-WAIVER}
+      - {type: subject_to, target: DEC-LIABILITY-ONLY}
+      - {type: subject_to, target: EXC-EXCLUDED-DRIVER}
+      - {type: subject_to, target: EXC-COMMERCIAL-USE}
+      - {type: subject_to, target: EXC-INTENTIONAL-DAMAGE}
+      - {type: subject_to, target: EXC-WEAR-AND-TEAR}
+      - {type: subject_to, target: EXC-MECHANICAL-BREAKDOWN}
+      - {type: subject_to, target: EXC-FREEZING}
+      - {type: subject_to, target: EXC-ROAD-DAMAGE-TIRES}
+      - {type: subject_to, target: EXC-PERSONAL-PROPERTY}
+      - {type: subject_to, target: EXC-ELECTRONIC-EQUIPMENT}
+      - {type: subject_to, target: EXC-CUSTOM-EQUIPMENT}
+      - {type: subject_to, target: EXC-WAR-NUCLEAR}
+      - {type: subject_to, target: EXC-CONFISCATION}
+      - {type: subject_to, target: COND-NOTICE-OF-LOSS}
+      - {type: subject_to, target: COND-THEFT-POLICE-REPORT}
+      - {type: subject_to, target: GEN-FRAUD}
+      - {type: see_also, target: INS-GLASS-BREAKAGE}
+      - {type: see_also, target: INS-TRANSPORTATION-EXPENSES}
+
+  - id: INS-GLASS-BREAKAGE
+    section: insuring_agreement
+    title: Glass breakage - choice of coverage
+    text: >-
+      Breakage of glass, such as a cracked or shattered windshield, side window or rear glass, is
+      paid under Other Than Collision. If the glass breaks as part of a collision, you may choose to
+      have the glass damage paid under Collision or under Other Than Collision, whichever deductible
+      suits you, as long as you carry that coverage. The rest of the collision damage stays under
+      Collision.
+    edges:
+      - {type: uses_term, target: DEF-OTHER-THAN-COLLISION}
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: subject_to, target: LIM-GLASS-REPAIR-WAIVER}
+      - {type: subject_to, target: LIM-DEDUCTIBLE}
+      - {type: see_also, target: LIM-ADAS-RECALIBRATION}
+
+  - id: INS-HIT-AND-RUN
+    section: insuring_agreement
+    title: Hit-and-run collision losses
+    text: >-
+      If your covered auto is struck by a hit-and-run vehicle, we pay the damage under Collision, so
+      you must carry Collision coverage. The collision deductible applies unless your state requires
+      otherwise. Because the other driver cannot be found, this coverage applies only if the
+      hit-and-run is reported to police within 24 hours and you can show physical evidence of
+      contact with another vehicle.
+    edges:
+      - {type: uses_term, target: DEF-HIT-AND-RUN-VEHICLE}
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: requires, target: COND-HIT-AND-RUN-POLICE-REPORT}
+      - {type: subject_to, target: LIM-DEDUCTIBLE}
+      - {type: subject_to, target: INS-COLLISION}
+      - {type: subject_to, target: LIM-LIMIT-OF-LIABILITY}
+
+  - id: INS-PERMISSIVE-USE
+    section: insuring_agreement
+    title: Coverage while a permissive user drives
+    text: >-
+      Physical damage coverage on your covered auto applies in the same way when the car is driven
+      by a permissive user, such as a friend of your child who borrowed it with permission, even
+      though that person is not listed on the declarations. The usual deductibles, limits and
+      exclusions apply. This does not extend to anyone named as an excluded driver.
+    edges:
+      - {type: uses_term, target: DEF-PERMISSIVE-USER}
+      - {type: uses_term, target: DEF-INSURED}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: subject_to, target: EXC-EXCLUDED-DRIVER}
+      - {type: subject_to, target: EXC-NO-REASONABLE-BELIEF}
+      - {type: subject_to, target: LIM-DEDUCTIBLE}
+      - {type: see_also, target: DEC-LISTED-DRIVERS}
+
+  - id: INS-NON-OWNED-AUTO
+    section: insuring_agreement
+    title: Coverage for non-owned autos
+    text: >-
+      The physical damage coverages you carry on your covered autos also apply to a non-owned auto,
+      such as a borrowed or rented car, while you or a family member are driving it. If you carry
+      different coverages on different vehicles, we apply the broadest coverage shown on the
+      declarations for any one vehicle. This coverage is excess over other collectible insurance.
+    edges:
+      - {type: uses_term, target: DEF-NON-OWNED-AUTO}
+      - {type: uses_term, target: DEF-FAMILY-MEMBER}
+      - {type: subject_to, target: LIM-NON-OWNED-AUTO}
+      - {type: subject_to, target: COND-OTHER-INSURANCE}
+      - {type: subject_to, target: LIM-DEDUCTIBLE}
+      - {type: subject_to, target: EXC-COMMERCIAL-USE}
+
+  - id: INS-RESULTING-LOSS
+    section: insuring_agreement
+    title: Resulting loss is covered
+    text: >-
+      The exclusions for wear and tear, freezing, mechanical or electrical breakdown and road damage
+      to tires do not apply to damage that results from a covered theft of the whole vehicle, or that
+      is caused by a covered collision or other covered comprehensive loss. For example, an engine
+      ruined after striking debris, a radiator cracked in a collision, or parts damaged by thieves are
+      covered.
+    edges:
+      - {type: see_also, target: EXC-MECHANICAL-BREAKDOWN}
+      - {type: see_also, target: EXC-WEAR-AND-TEAR}
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: uses_term, target: DEF-OTHER-THAN-COLLISION}
+
+  - id: INS-TRANSPORTATION-EXPENSES
+    section: insuring_agreement
+    title: Transportation expenses after theft
+    text: >-
+      If your covered auto is stolen and you carry Other Than Collision coverage, we will reimburse
+      the cost of a rental car or other transportation, up to $30 per day and $900 in total. Payment
+      starts 48 hours after the theft is reported to us and to police, and ends when the vehicle is
+      returned to use or we pay for the theft. No deductible applies to this reimbursement.
+    edges:
+      - {type: uses_term, target: DEF-OTHER-THAN-COLLISION}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: requires, target: COND-THEFT-POLICE-REPORT}
+      - {type: see_also, target: PAY-STOLEN-VEHICLE-RECOVERY}
+
+  # ------------------------------------------------------------------ exclusions
+  - id: EXC-EXCLUDED-DRIVER
+    section: exclusions
+    title: Named excluded driver
+    text: >-
+      We provide no coverage of any kind, including Collision and Other Than Collision, for any loss
+      that occurs while your covered auto or any other vehicle is being driven by, or is under the
+      control of, a person named as an excluded driver. This applies even if you gave permission,
+      the person was moving the car a short distance, or it was an emergency.
+    edges:
+      - {type: uses_term, target: DEF-EXCLUDED-DRIVER}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: see_also, target: DEC-DECLARATIONS}
+
+  - id: EXC-WEAR-AND-TEAR
+    section: exclusions
+    title: Wear and tear
+    text: >-
+      We do not pay for loss caused by and confined to wear and tear, gradual deterioration, rust,
+      corrosion, fading or cracking paint, worn brakes or worn tires. Normal upkeep and maintenance
+      are your responsibility. This exclusion does not apply when the damage results from a covered
+      theft or is caused by a covered collision or comprehensive loss.
+    edges:
+      - {type: has_exception, target: INS-RESULTING-LOSS}
+      - {type: uses_term, target: DEF-LOSS}
+
+  - id: EXC-MECHANICAL-BREAKDOWN
+    section: exclusions
+    title: Mechanical or electrical breakdown
+    text: >-
+      We do not pay for loss caused by and confined to mechanical or electrical breakdown or failure,
+      such as a blown engine, failed transmission, dead battery, broken timing belt or electrical
+      short that is not caused by an outside event. This exclusion does not apply if the breakdown
+      results from a covered theft or is caused by a covered collision or comprehensive loss.
+    edges:
+      - {type: has_exception, target: INS-RESULTING-LOSS}
+      - {type: uses_term, target: DEF-LOSS}
+      - {type: see_also, target: EXC-WEAR-AND-TEAR}
+
+  - id: EXC-FREEZING
+    section: exclusions
+    title: Freezing
+    text: >-
+      We do not pay for loss caused by freezing, such as a cracked engine block or radiator because
+      the coolant froze. This exclusion does not apply to freezing damage that results from a covered
+      theft or that is caused by another covered collision or comprehensive loss, for example a
+      cooling system breached in a collision and left to freeze.
+    edges:
+      - {type: has_exception, target: INS-RESULTING-LOSS}
+      - {type: uses_term, target: DEF-LOSS}
+
+  - id: EXC-ROAD-DAMAGE-TIRES
+    section: exclusions
+    title: Road damage to tires
+    text: >-
+      We do not pay for damage to tires caused by road conditions or road hazards, such as punctures
+      from nails, cuts from potholes, or blowouts, when only the tires are damaged. If tire damage
+      happens together with other covered damage in the same collision or comprehensive loss, or the
+      tires are stolen, we pay for the tires too.
+    edges:
+      - {type: has_exception, target: INS-RESULTING-LOSS}
+      - {type: uses_term, target: DEF-COLLISION}
+
+  - id: EXC-COMMERCIAL-USE
+    section: exclusions
+    title: Carrying people or property for a fee; rideshare and delivery
+    text: >-
+      We do not pay for loss to your covered auto while it is being used to carry people or property
+      for a fee, or during transportation network activity or delivery activity, meaning while the
+      driver is logged into a rideshare or delivery app. Sharing gas money in a car pool is not a fee.
+      This exclusion is removed by the Rideshare endorsement if it is shown on the declarations.
+    edges:
+      - {type: uses_term, target: DEF-TNC-ACTIVITY}
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: overridden_by, target: END-RIDESHARE}
+
+  - id: EXC-INTENTIONAL-DAMAGE
+    section: exclusions
+    title: Intentional damage by an insured
+    text: >-
+      We do not pay for loss that an insured causes on purpose or arranges for someone else to cause,
+      such as deliberately crashing, burning or abandoning the vehicle to collect insurance, or a
+      staged theft. Vandalism by a stranger is still covered under Other Than Collision; this
+      exclusion concerns acts by or for an insured.
+    edges:
+      - {type: uses_term, target: DEF-INSURED}
+      - {type: see_also, target: GEN-FRAUD}
+
+  - id: EXC-RACING
+    section: exclusions
+    title: Racing and speed contests
+    text: >-
+      We do not pay for loss to any vehicle while it is in, practicing for, or preparing for an
+      organized race, speed contest, drifting event or timed performance run, including track days
+      at a racing facility, whether or not prizes are offered. Ordinary driving on public roads,
+      even if above the speed limit, is not a speed contest under this clause.
+    edges:
+      - {type: uses_term, target: DEF-LOSS}
+
+  - id: EXC-WAR-NUCLEAR
+    section: exclusions
+    title: War and nuclear hazard
+    text: >-
+      We do not pay for loss caused by war, whether declared or not, civil war, insurrection,
+      rebellion or revolution, or by any act or condition incident to them. We also do not pay for
+      loss caused by a nuclear reaction, radiation or radioactive contamination, whatever its cause.
+      Riot and civil commotion are not war and remain covered under comprehensive.
+    edges:
+      - {type: uses_term, target: DEF-LOSS}
+
+  - id: EXC-CONFISCATION
+    section: exclusions
+    title: Confiscation by government
+    text: >-
+      We do not pay for loss caused by the seizure, impoundment, forfeiture, confiscation or
+      destruction of a vehicle by any government or civil authority, for example after an arrest,
+      unpaid fines or use in a crime. Towing and storage fees charged during such a seizure are also
+      not covered.
+    edges:
+      - {type: uses_term, target: DEF-LOSS}
+
+  - id: EXC-DIMINUTION-IN-VALUE
+    section: exclusions
+    title: Diminution in value
+    text: >-
+      We do not pay for any loss of market or resale value of a vehicle that remains after it has
+      been properly repaired, sometimes called diminished value or inherent diminished value. Our
+      obligation is to restore the vehicle to its pre-loss condition with parts and repairs of like
+      kind and quality, not to compensate for a vehicle history report showing an accident.
+    edges:
+      - {type: uses_term, target: DEF-LOSS}
+      - {type: see_also, target: LIM-LIMIT-OF-LIABILITY}
+
+  - id: EXC-PERSONAL-PROPERTY
+    section: exclusions
+    title: Personal property in the vehicle
+    text: >-
+      We do not pay for personal belongings that are in or on the vehicle but not permanently
+      attached to it, such as phones, laptops, purses, tools, sports gear, clothing or luggage, even
+      if they are stolen or damaged together with the vehicle. Such items may be covered by a
+      homeowners or renters policy.
+    edges:
+      - {type: uses_term, target: DEF-LOSS}
+      - {type: see_also, target: EXC-ELECTRONIC-EQUIPMENT}
+
+  - id: EXC-CUSTOM-EQUIPMENT
+    section: exclusions
+    title: Custom equipment above $1,500
+    text: >-
+      We pay no more than $1,500 in total, per loss, for custom equipment on your covered auto,
+      unless the custom equipment and its value are scheduled on the declarations through the Custom
+      Equipment endorsement. Any value above $1,500, or above the scheduled amount, is excluded.
+      Factory-installed options are not custom equipment and are not limited by this clause.
+    edges:
+      - {type: uses_term, target: DEF-CUSTOM-EQUIPMENT}
+      - {type: overridden_by, target: END-CUSTOM-EQUIPMENT-SCHEDULE}
+
+  - id: EXC-ELECTRONIC-EQUIPMENT
+    section: exclusions
+    title: Electronic equipment not permanently installed
+    text: >-
+      We do not pay for loss to electronic equipment that receives, records or plays sound, video or
+      data unless it is permanently installed in the dash, console or a location the maker used for
+      such equipment. Portable navigation units, dash cameras held by suction cups, radar detectors,
+      removable stereo faceplates, tablets and their accessories are not covered.
+    edges:
+      - {type: uses_term, target: DEF-LOSS}
+      - {type: see_also, target: EXC-PERSONAL-PROPERTY}
+
+  - id: EXC-NO-REASONABLE-BELIEF
+    section: exclusions
+    title: Use without reasonable belief of permission
+    text: >-
+      We do not pay for loss to a vehicle while it is used by a person who does not reasonably
+      believe they are entitled to use it, such as a person who took the keys without asking or who
+      kept the car well beyond the permission given. This does not apply to a family member using
+      your covered auto. A thief's use of the car is handled under theft coverage.
+    edges:
+      - {type: uses_term, target: DEF-PERMISSIVE-USER}
+      - {type: uses_term, target: DEF-FAMILY-MEMBER}
+      - {type: see_also, target: INS-PERMISSIVE-USE}
+
+  # ------------------------------------------------------------------ limits
+  - id: LIM-LIMIT-OF-LIABILITY
+    section: limits
+    title: Most we will pay
+    text: >-
+      The most we will pay for loss to a vehicle is the lesser of (1) its actual cash value just
+      before the loss, or (2) the amount needed to repair or replace the damaged property with parts
+      and labor of like kind and quality, minus the applicable deductible. If a repair or
+      replacement leaves the vehicle better than before, we may deduct for betterment of parts that
+      wear out, such as tires and batteries.
+    edges:
+      - {type: uses_term, target: DEF-ACTUAL-CASH-VALUE}
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: see_also, target: LIM-TOTAL-LOSS}
+      - {type: see_also, target: LIM-ADAS-RECALIBRATION}
+
+  - id: LIM-DEDUCTIBLE
+    section: limits
+    title: Applying the deductible
+    text: >-
+      For each covered loss we subtract the deductible for the coverage that pays: the collision
+      deductible for collision and hit-and-run losses, and the comprehensive deductible for animal,
+      theft, vandalism, fire, weather and glass losses. If two covered vehicles are damaged in the
+      same collision, only the highest single deductible applies. Our payment equals the covered
+      amount minus the deductible.
+    edges:
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: uses_term, target: DEF-COLLISION}
+      - {type: uses_term, target: DEF-OTHER-THAN-COLLISION}
+      - {type: see_also, target: DEC-DEDUCTIBLES}
+      - {type: see_also, target: LIM-LOSS-BELOW-DEDUCTIBLE}
+
+  - id: LIM-LOSS-BELOW-DEDUCTIBLE
+    section: limits
+    title: Losses at or below the deductible
+    text: >-
+      If the covered amount of a loss is equal to or less than the applicable deductible, we pay
+      nothing for it, although the claim may still be recorded. For example, a $400 repair under a
+      $500 collision deductible results in no payment. A claim of this kind is closed without
+      payment rather than denied for lack of coverage.
+    edges:
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: see_also, target: LIM-DEDUCTIBLE}
+
+  - id: LIM-TOTAL-LOSS
+    section: limits
+    title: Settlement of a total loss
+    text: >-
+      If your vehicle is a total loss, we pay its actual cash value just before the loss minus the
+      applicable deductible, plus applicable sales tax and title fees where state law requires. We do
+      not pay repair costs on a total loss. Payment is made to you and any loss payee, and we may
+      take ownership of the salvage.
+    edges:
+      - {type: uses_term, target: DEF-TOTAL-LOSS}
+      - {type: uses_term, target: DEF-ACTUAL-CASH-VALUE}
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: see_also, target: PAY-SALVAGE}
+      - {type: see_also, target: PAY-LOSS-PAYEE}
+
+  - id: LIM-NON-OWNED-AUTO
+    section: limits
+    title: Limit for non-owned autos
+    text: >-
+      For a non-owned auto, the most we will pay is the lesser of its actual cash value or the cost
+      to repair it, minus the highest collision or comprehensive deductible that applies to your
+      covered autos. We also pay loss of use charged by a rental company, up to $30 per day and $900
+      total, when it results from a covered loss.
+    edges:
+      - {type: uses_term, target: DEF-NON-OWNED-AUTO}
+      - {type: uses_term, target: DEF-ACTUAL-CASH-VALUE}
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+
+  - id: LIM-ADAS-RECALIBRATION
+    section: limits
+    title: Sensor recalibration is part of repair cost
+    text: >-
+      When a covered repair requires removing, replacing or realigning a windshield, bumper, mirror
+      or other part that carries ADAS cameras or sensors, the reasonable cost to recalibrate those
+      systems to the maker's specifications is part of the cost of repair. It is included when we
+      compare repair cost with actual cash value and is subject to the same deductible.
+    edges:
+      - {type: uses_term, target: DEF-ADAS}
+      - {type: uses_term, target: DEF-ACTUAL-CASH-VALUE}
+      - {type: see_also, target: LIM-LIMIT-OF-LIABILITY}
+      - {type: see_also, target: DEF-TOTAL-LOSS}
+
+  - id: LIM-GLASS-REPAIR-WAIVER
+    section: limits
+    title: Deductible waived for glass repair
+    text: >-
+      Under Other Than Collision, we waive the comprehensive deductible when a chipped or cracked
+      windshield or other glass can be repaired, for example by resin injection, instead of being
+      replaced. If the glass must be replaced, the comprehensive deductible applies in the normal
+      way. This waiver does not apply to glass paid under Collision.
+    edges:
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: uses_term, target: DEF-OTHER-THAN-COLLISION}
+      - {type: see_also, target: INS-GLASS-BREAKAGE}
+
+  # ------------------------------------------------------------------ payment
+  - id: PAY-PAYMENT-OF-LOSS
+    section: payment
+    title: How we pay a loss
+    text: >-
+      We may pay for a covered loss in money, or we may repair or replace the damaged or stolen
+      property. You may choose the repair shop. We will pay within 30 days after we agree on the
+      amount of loss. If we pay money, we pay you and any loss payee shown on the declarations, as
+      their interests may appear. We may return stolen property and pay for any damage.
+    edges:
+      - {type: see_also, target: PAY-LOSS-PAYEE}
+      - {type: see_also, target: LIM-LIMIT-OF-LIABILITY}
+      - {type: see_also, target: PAY-STOLEN-VEHICLE-RECOVERY}
+
+  - id: PAY-LOSS-PAYEE
+    section: payment
+    title: Loss payee and lienholder
+    text: >-
+      If the declarations name a loss payee, such as a bank or finance company that holds a lien on
+      a financed vehicle or a leasing company, we include that party on payments for physical damage
+      as its interest may appear. On a total loss the loan or lease balance is paid first, up to the
+      amount owed, and any remainder goes to you. We will give the loss payee 10 days notice before
+      cancelling coverage.
+    edges:
+      - {type: see_also, target: PAY-PAYMENT-OF-LOSS}
+      - {type: see_also, target: LIM-TOTAL-LOSS}
+
+  - id: PAY-SALVAGE
+    section: payment
+    title: Salvage
+    text: >-
+      When we pay a total loss or pay the full value of stolen property, we may take the damaged
+      vehicle or the recovered property as salvage, and you must transfer title to us. If you wish to
+      keep a totaled vehicle, we may agree to subtract its salvage value from our payment, and state
+      branding rules for salvage titles will apply.
+    edges:
+      - {type: uses_term, target: DEF-TOTAL-LOSS}
+      - {type: see_also, target: LIM-TOTAL-LOSS}
+
+  - id: PAY-STOLEN-VEHICLE-RECOVERY
+    section: payment
+    title: Recovered stolen vehicles
+    text: >-
+      If a stolen covered auto is recovered before we pay the theft claim, we may return it to you
+      and pay for any damage caused during the theft, minus the comprehensive deductible. If it is
+      recovered after we have paid for it, it belongs to us, but you may buy it back by repaying the
+      amount we paid, less the cost of any damage.
+    edges:
+      - {type: uses_term, target: DEF-OTHER-THAN-COLLISION}
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: see_also, target: PAY-SALVAGE}
+      - {type: see_also, target: DEF-TOTAL-LOSS}
+
+  # ------------------------------------------------------------------ conditions
+  - id: COND-NOTICE-OF-LOSS
+    section: conditions
+    title: Prompt notice of loss
+    text: >-
+      You or someone on your behalf must tell us about any loss promptly, giving the time, place and
+      circumstances, the names of drivers and witnesses, and any police report number. For this
+      policy, notice given more than 30 days after the date of loss is considered late. Late notice
+      is handled under the late-notice condition, which requires us to show harm before we deny.
+    edges:
+      - {type: see_also, target: COND-LATE-NOTICE}
+      - {type: see_also, target: COND-COOPERATION}
+
+  - id: COND-LATE-NOTICE
+    section: conditions
+    title: Late notice does not by itself void coverage
+    text: >-
+      Reporting a loss more than 30 days after it happened does not, by itself, take away coverage.
+      We may deny or reduce a late-reported claim only to the extent the delay actually harmed our
+      ability to investigate, for example because the vehicle was already repaired, evidence was
+      lost, or a responsible party could no longer be pursued. Late claims are reviewed by an
+      adjuster to decide whether such harm occurred.
+    edges:
+      - {type: see_also, target: COND-NOTICE-OF-LOSS}
+      - {type: see_also, target: COND-INSPECTION-BEFORE-REPAIR}
+
+  - id: COND-HIT-AND-RUN-POLICE-REPORT
+    section: conditions
+    title: Police report for hit-and-run
+    text: >-
+      For a loss caused by a hit-and-run vehicle, the insured or someone on their behalf must report
+      the accident to the police or other law enforcement within 24 hours of the accident, or as
+      soon as reasonably possible if prevented by injury, and give us the report number. A
+      hit-and-run report made later than this does not meet this condition.
+    edges:
+      - {type: uses_term, target: DEF-HIT-AND-RUN-VEHICLE}
+      - {type: see_also, target: INS-HIT-AND-RUN}
+
+  - id: COND-THEFT-POLICE-REPORT
+    section: conditions
+    title: Police report for theft
+    text: >-
+      If your covered auto or any of its parts or equipment is stolen, you must promptly report the
+      theft to police and confirm that the vehicle is listed as stolen with law enforcement, then
+      give us the report number. A theft claim, including a carjacking, will not be paid unless the
+      vehicle has been reported stolen to police.
+    edges:
+      - {type: uses_term, target: DEF-YOUR-COVERED-AUTO}
+      - {type: see_also, target: INS-COMPREHENSIVE}
+      - {type: see_also, target: COND-NOTICE-OF-LOSS}
+
+  - id: COND-COOPERATION
+    section: conditions
+    title: Cooperation
+    text: >-
+      Anyone seeking payment under this policy must cooperate with us in the investigation and
+      settlement of the claim. This includes giving recorded statements when asked, providing
+      requested records such as repair invoices, purchase papers, loan documents, phone and app logs,
+      and allowing us to inspect the vehicle and any recovered parts.
+    edges:
+      - {type: see_also, target: COND-PROOF-OF-LOSS-EUO}
+      - {type: see_also, target: COND-INSPECTION-BEFORE-REPAIR}
+
+  - id: COND-PROTECT-FROM-FURTHER-LOSS
+    section: conditions
+    title: Protecting the vehicle from further loss
+    text: >-
+      After a loss you must take reasonable steps to protect the vehicle from further damage, such as
+      covering a broken window, moving it to a safe place or having it towed. We will pay reasonable
+      expenses you incur for this protection as part of the loss. We do not pay for added damage that
+      results from failing to protect the vehicle.
+    edges:
+      - {type: uses_term, target: DEF-LOSS}
+      - {type: see_also, target: END-ROADSIDE-ASSISTANCE}
+
+  - id: COND-INSPECTION-BEFORE-REPAIR
+    section: conditions
+    title: Inspection before repair
+    text: >-
+      Before repairs begin or the vehicle is disposed of, you must give us a reasonable chance to
+      inspect and photograph the damage, either in person or through photos or video we request.
+      Emergency repairs needed to protect the vehicle may be done first. If the vehicle is repaired
+      or scrapped before we can inspect it, the late-notice condition governs any effect on coverage.
+    edges:
+      - {type: see_also, target: COND-LATE-NOTICE}
+      - {type: see_also, target: COND-PROTECT-FROM-FURTHER-LOSS}
+
+  - id: COND-PROOF-OF-LOSS-EUO
+    section: conditions
+    title: Proof of loss and examination under oath
+    text: >-
+      When we ask, the person seeking payment must send a signed, sworn proof of loss within 60 days,
+      and must submit to an examination under oath, apart from other insureds, as often as we
+      reasonably require. Our special investigations unit (SIU) may review any claim with signs of
+      possible fraud before we decide it. Refusing these requests may prevent payment.
+    edges:
+      - {type: see_also, target: GEN-FRAUD}
+      - {type: see_also, target: COND-COOPERATION}
+
+  - id: COND-APPRAISAL
+    section: conditions
+    title: Appraisal of disputed amount
+    text: >-
+      If you and we agree that a loss is covered but disagree on the amount, such as the actual cash
+      value or the repair cost, either side may demand appraisal in writing. Each side picks an
+      appraiser, the two appraisers pick an umpire, and a written agreement by any two sets the
+      amount. Each side pays its own appraiser and half the umpire. Appraisal does not decide
+      coverage questions.
+    edges:
+      - {type: uses_term, target: DEF-ACTUAL-CASH-VALUE}
+      - {type: see_also, target: LIM-LIMIT-OF-LIABILITY}
+
+  - id: COND-OTHER-INSURANCE
+    section: conditions
+    title: Other insurance
+    text: >-
+      If other physical damage insurance also covers the same loss to your covered auto, we pay our
+      share, which is our limit divided by the total of all applicable limits. For a non-owned auto
+      or a temporary substitute auto, our coverage is excess over any other collectible insurance,
+      including the owner's policy or rental company coverage.
+    edges:
+      - {type: uses_term, target: DEF-NON-OWNED-AUTO}
+      - {type: uses_term, target: DEF-TEMPORARY-SUBSTITUTE-AUTO}
+      - {type: see_also, target: INS-NON-OWNED-AUTO}
+
+  - id: COND-SUBROGATION
+    section: conditions
+    title: Our right to recover payment
+    text: >-
+      After we pay a loss, we take over your right to recover that amount from anyone responsible,
+      such as an at-fault driver or their insurer. You must help us and must not do anything after
+      the loss that harms this right, such as signing a release. If we recover money, we first
+      reimburse your deductible in proportion to the recovery.
+    edges:
+      - {type: uses_term, target: DEF-DEDUCTIBLE}
+      - {type: see_also, target: INS-COLLISION}
+
+  # ------------------------------------------------------------------ general provisions
+  - id: GEN-POLICY-PERIOD
+    section: general
+    title: Policy period
+    text: >-
+      This policy covers only losses that happen during the policy period shown on the declarations,
+      which begins and ends at 12:01 a.m. standard time at your address. A loss that occurred before
+      the policy started or after it ended or was cancelled is not covered, even if it is reported to
+      us during a later policy period.
+    edges:
+      - {type: see_also, target: DEC-DECLARATIONS}
+      - {type: see_also, target: GEN-POLICY-TERRITORY}
+
+  - id: GEN-POLICY-TERRITORY
+    section: general
+    title: Policy territory
+    text: >-
+      This policy covers losses that happen within the United States of America, its territories and
+      possessions, Puerto Rico and Canada, and while the vehicle is being shipped between their
+      ports. Losses in Mexico or any other country are not covered under this physical damage part.
+    edges:
+      - {type: see_also, target: GEN-POLICY-PERIOD}
+
+  - id: GEN-FRAUD
+    section: general
+    title: Fraud and misrepresentation
+    text: >-
+      We do not provide coverage for any insured who has made fraudulent statements or engaged in
+      fraudulent conduct in connection with any loss or claim, such as inflating repair costs,
+      staging an accident, reporting a false theft or hiding prior damage. A material misstatement in
+      the application may void the policy. We may investigate any suspected fraud through our
+      special investigations unit and refer it to state authorities as the law requires.
+    edges:
+      - {type: uses_term, target: DEF-INSURED}
+      - {type: see_also, target: COND-PROOF-OF-LOSS-EUO}
+      - {type: see_also, target: EXC-INTENTIONAL-DAMAGE}
+
+  # ------------------------------------------------------------------ endorsements
+  - id: END-RIDESHARE
+    section: endorsements
+    title: Rideshare and delivery endorsement
+    text: >-
+      If this endorsement is shown on the declarations, the exclusion for carrying people or property
+      for a fee and for transportation network or delivery activity does not apply to Collision and
+      Other Than Collision while the driver is logged into the app and waiting for a request or
+      travelling to a pickup. Coverage still depends on the vehicle having those coverages and is
+      subject to the usual deductibles. Losses while a passenger or order is on board fall to the
+      platform's own insurance first, with this policy excess.
+    edges:
+      - {type: uses_term, target: DEF-TNC-ACTIVITY}
+      - {type: see_also, target: EXC-COMMERCIAL-USE}
+      - {type: see_also, target: COND-OTHER-INSURANCE}
+      - {type: subject_to, target: LIM-DEDUCTIBLE}
+
+  - id: END-ROADSIDE-ASSISTANCE
+    section: endorsements
+    title: Towing and roadside assistance endorsement
+    text: >-
+      If this endorsement is shown on the declarations, we pay up to $100 per disablement for towing
+      to the nearest qualified repair facility and for labor at the place of breakdown, such as a
+      jump start, tire change, lockout service or fuel delivery (cost of fuel not included). No
+      deductible applies. This endorsement pays even when the breakdown itself is not a covered loss.
+    edges:
+      - {type: see_also, target: EXC-MECHANICAL-BREAKDOWN}
+      - {type: see_also, target: COND-PROTECT-FROM-FURTHER-LOSS}
+
+  - id: END-CUSTOM-EQUIPMENT-SCHEDULE
+    section: endorsements
+    title: Scheduled custom equipment endorsement
+    text: >-
+      If this endorsement is shown on the declarations, the $1,500 cap on custom equipment is
+      replaced by the amount scheduled for each item, as long as you provided receipts or photos when
+      the item was scheduled. Losses to scheduled custom equipment are paid under the same coverage
+      and deductible as the rest of the vehicle damage.
+    edges:
+      - {type: uses_term, target: DEF-CUSTOM-EQUIPMENT}
+      - {type: see_also, target: EXC-CUSTOM-EQUIPMENT}

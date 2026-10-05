@@ -63,7 +63,7 @@ def test_harness_retry_and_seed(carrier_config: dict) -> None:
 
 def test_models_cover_every_role(carrier_config: dict) -> None:
     roles = {"intake", "coverage", "fraud", "adjudicator", "judge", "synthetic_generator"}
-    assert roles <= set(carrier_config["models"])
+    assert roles <= set(carrier_config["models"]["roles"])
 
 
 # ---------------------------------------------------------------- secrets hygiene

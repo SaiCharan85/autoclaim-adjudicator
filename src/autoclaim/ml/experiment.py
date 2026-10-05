@@ -172,8 +172,10 @@ def _paired_savings(
     return float(point), float(lo), float(hi)
 
 
+REPAIR_COST = "+ repair_cost residual"
+
 LEVERS: dict[str, list[Variant]] = {
-    "repair_cost": [Variant("+ repair_cost residual", stages=("repair_cost",))],
+    "repair_cost": [Variant(REPAIR_COST, stages=("repair_cost",))],
     "weighting": [
         Variant("+ repair_cost + amount weights", stages=("repair_cost",), weight_by_amount=True)
     ],
@@ -195,6 +197,12 @@ LEVERS: dict[str, list[Variant]] = {
 }
 
 
+def references_present(results: Sequence[VariantResult], wanted: Sequence[str]) -> list[str]:
+    """The requested references that were actually run, in the requested order."""
+    names = {r.variant.name for r in results}
+    return [ref for ref in wanted if ref in names]
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     from autoclaim.lines.auto.datasets import get_spec
 
@@ -202,7 +210,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Compare fraud-model variants on validation.")
     parser.add_argument("--dataset", default=cfg.production_dataset, choices=sorted(cfg.datasets))
     parser.add_argument("--levers", nargs="*", default=["repair_cost"], choices=sorted(LEVERS))
-    parser.add_argument("--reference", default="baseline")
+    parser.add_argument(
+        "--reference",
+        nargs="+",
+        default=["baseline", REPAIR_COST],
+        help="one paired-comparison table per reference (missing ones are skipped)",
+    )
     parser.add_argument("--report", default=None)
     args = parser.parse_args(argv)
 
@@ -212,9 +225,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     start = time.perf_counter()
     results = [run_variant(v, frame, spec, cfg) for v in variants]
     _, val, _ = spec.split(frame)
-    table = compare(results, val, cfg, args.reference)
     print(f"{len(variants)} variants in {time.perf_counter() - start:.0f}s (validation only)")
-    print(table.to_string())
+    sections = []
+    for ref in references_present(results, args.reference):
+        table = compare(results, val, cfg, ref)
+        print(f"\n## vs {ref}\n{table.to_string()}")
+        sections.append(f"## vs {ref}\n\n{to_markdown(table, 'variant')}\n")
     if args.report:
-        Path(args.report).write_text(to_markdown(table, "variant") + "\n", encoding="utf-8")
+        Path(args.report).write_text("\n".join(sections), encoding="utf-8")
     return 0

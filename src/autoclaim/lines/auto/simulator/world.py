@@ -49,6 +49,20 @@ class FraudWorld(BaseModel):
     legit_address_change_recent_share: float = Field(ge=0, le=1)
 
 
+class TheftRecovery(BaseModel):
+    rate: float = Field(ge=0, le=1)  # share of stolen vehicles recovered (then repaired)
+    damage_fraction: tuple[float, float]  # lognormal median, sigma of a recovered car's damage
+
+
+class AppraisalWorld(BaseModel):
+    log_bias: float
+    sigma: float = Field(ge=0)
+    shop_sigma: float = Field(default=0.0, ge=0)  # honest shop error, folded into the gap
+    prior_damage_detect: float = Field(ge=0, le=1)
+    prior_damage_false_flag: float = Field(ge=0, le=1)
+    seed_offset: int
+
+
 class HoldoutSpec(BaseModel):
     seed: int
     n_claims: int = Field(gt=0)
@@ -91,6 +105,7 @@ class World(BaseModel):
     luxury_makes: list[str]
     luxury_multiplier: float = Field(ge=1)
     adas_glass_recalibration_usd: float = Field(ge=0)
+    theft_recovery: TheftRecovery
     police_report_rate: dict[str, float]
     police_report_hours: LogNormal
     witness_rate: dict[str, float]
@@ -98,6 +113,7 @@ class World(BaseModel):
     injury_rate: dict[str, float]
     at_fault_rate: dict[str, float]
     fraud: FraudWorld
+    appraisal: AppraisalWorld
     traps: dict[str, float]
     holdouts: Holdouts | None = None
 

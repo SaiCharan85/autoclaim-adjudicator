@@ -1,0 +1,31 @@
+# Real aggregate figures used to CHECK (and later calibrate) the simulator. Single cited facts
+# only: no tables or text are copied. Each entry: value, unit, year, source, url, note.
+# Sources verified 2026-10-04 (see DATA.md source 10).
+
+collision_claim_severity_usd:
+  - {year: 2024, value: 5489, unit: "USD per paid collision claim (average)",
+     source: "Insurance Information Institute, auto facts (ISO/Verisk data)",
+     url: "https://www.iii.org/fact-statistic/facts-statistics-auto-insurance"}
+comprehensive_claim_severity_usd:
+  - {year: 2024, value: 2306, unit: "USD per paid comprehensive claim (average)",
+     source: "Insurance Information Institute, auto facts (ISO/Verisk data)",
+     url: "https://www.iii.org/fact-statistic/facts-statistics-auto-insurance"}
+collision_claim_frequency:
+  - {year: 2024, value: 4.16, unit: "paid claims per 100 insured vehicle-years",
+     source: "Insurance Information Institute, auto facts (ISO/Verisk data)",
+     url: "https://www.iii.org/fact-statistic/facts-statistics-auto-insurance"}
+comprehensive_claim_frequency:
+  - {year: 2024, value: 3.95, unit: "paid claims per 100 insured vehicle-years",
+     source: "Insurance Information Institute, auto facts (ISO/Verisk data)",
+     url: "https://www.iii.org/fact-statistic/facts-statistics-auto-insurance"}
+average_repairable_severity_usd:
+  - {year: 2024, value: 4730, unit: "USD per repairable vehicle claim (approx.)",
+     source: "CCC Intelligent Solutions, Crash Course", url: "https://www.cccis.com/crash-course"}
+total_loss_share:
+  - {year: 2025, value: 0.23, unit: "share of physical-damage claims declared total losses (approx.)",
+     source: "CCC Intelligent Solutions, Crash Course", url: "https://www.cccis.com/crash-course",
+     note: "A rising trend since the 2010s as repair costs outpaced vehicle values."}
+cpi_series:
+  source: "U.S. Bureau of Labor Statistics CPI-U (public domain)"
+  series: {repair: CUUR0000SETD, new_vehicles: CUUR0000SETA01, used_vehicles: CUUR0000SETA02}
+  data: data/raw/bls_cpi/cpi_annual.csv

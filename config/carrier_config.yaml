@@ -11,6 +11,14 @@ retrieval:
     M: 32
     ef_construction: 200
     ef_search: 64
+  # Local embeddings only (user choice): fastembed ONNX on CPU, downloaded once to .cache/fastembed
+  embedding_model: BAAI/bge-large-en-v1.5
+  query_prefix: "Represent this sentence for searching relevant passages: "
+  rrf_k: 60            # Reciprocal Rank Fusion constant (standard value)
+  candidates: 20       # per ranker, before fusion
+  top_k: 5             # search hits passed on
+  graph_hops: 1        # policy-graph expansion (set from docs/retrieval_benchmark.md)
+  max_expanded: 6      # cap on graph additions, to keep prompts small
 
 harness:
   max_retries: 2          # critic/judge -> adjudicator retry loop
@@ -24,11 +32,28 @@ fraud_model:
   review_budget: 0.05          # share of claims the fraud team (SIU) can review; recall is measured at this cut
   seeds: [42, 43, 44]          # every benchmark number is mean +/- std over these
   siu_review_cost_usd: 300     # assumed cost of one investigation, for the net-savings metric
+  triage:                      # two-stage fraud triage (docs/fraud_triage.md)
+    stage2_dataset: sim_us_appraisal
+    stage1_budget: 0.05        # top 5% at first notice -> fraud team (SIU)
+    target_true_recall: 0.80   # user target: intercept >= 80% of TRUE fraud
+    stage2_threshold: 0.174461 # re-fit on validation after appraisal.shop_sigma (2026-10-04); frozen
   datasets:
     sim_us:
       val_start: "2024-01-01"
       test_start: "2024-07-01"
       sensitive_features: []   # the simulator generates no sex or marital status
+    sim_us_appraisal:          # stage 2: same claims and splits, plus the appraisal (docs/fraud_triage.md)
+      val_start: "2024-01-01"
+      test_start: "2024-07-01"
+      sensitive_features: []
+    sim_decades:               # 2002-2024 multi-decade world (scripts/simulate_decades.py)
+      val_start: "2024-01-01"
+      test_start: "2024-07-01"
+      sensitive_features: []
+    sim_decades_appraisal:     # stage 2 on the multi-decade world
+      val_start: "2024-01-01"
+      test_start: "2024-07-01"
+      sensitive_features: []
     legacy_1990s:
       train_years: [1994, 1995]
       test_years: [1996]
@@ -57,19 +82,43 @@ jurisdictions:
 # Step 3: deductibles per coverage (collision vs. comprehensive)
 deductibles: {}
 
-# Step 5: routing thresholds (confidence, fraud risk, auto-approval authority limit)
-router: {}
+# Routing (code, after hard rules): anything here sends the claim to a human adjuster.
+router:
+  min_confidence: 0.7          # adjudicator's self-reported confidence below this -> human
+  fraud_review_score: 0.24     # approve with fraud score >= this -> human (= top 5% of validation claims, the SIU budget)
+  authority_limit_usd: 15000   # auto-approval authority per claim
 
-# Step 5: per-claim budget caps (tokens, cost USD, steps)
-budgets: {}
+# Per-claim caps: crossing one trips the claim to human review (cost is always $0: free tiers).
+budgets:
+  max_llm_calls: 14            # 5 nodes x up to 3 adjudication attempts, with headroom
+  max_tokens: 60000
 
-# Step 4+: model per role, all free (Groq / Google AI Studio free tiers, Ollama local fallback).
-# Judge must be a different model (ideally a different family) from the adjudicator.
+# LLMs: all free (Groq + Google AI Studio free tiers; local Ollama when it is running).
+# Limits are each provider's free tier (Groq: docs 2026-10-04; Google: AI Studio shows the live
+# numbers per project, these are conservative). The usage ledger hard-stops at safety_margin x limit,
+# then the role falls back to the next model; when the chain is exhausted the claim goes to a human.
 models:
-  providers: [groq, google, ollama]   # fallback order is set per role in Step 4
-  intake: TBD
-  coverage: TBD
-  fraud: TBD
-  adjudicator: TBD
-  judge: TBD
-  synthetic_generator: TBD
+  safety_margin: 0.9
+  day_reset_utc_offset_hours: -8   # daily quotas reset at Pacific midnight; PST is the conservative choice
+  timeout_s: 90
+  cache_path: .cache/llm/cache.sqlite3
+  usage_path: .cache/llm/usage.sqlite3
+  providers:
+    groq: {base_url: "https://api.groq.com/openai/v1", api_key_env: GROQ_API_KEY}
+    google: {base_url: "https://generativelanguage.googleapis.com/v1beta/openai", api_key_env: GOOGLE_API_KEY}
+    ollama: {base_url: "http://localhost:11434/v1", api_key_env: null}
+  catalog:   # "<provider>:<model id>" -> family (judge must differ from adjudicator) + free limits
+    "groq:openai/gpt-oss-120b": {family: gpt-oss, efforts: [low, medium, high], rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
+    "groq:openai/gpt-oss-20b": {family: gpt-oss, efforts: [low, medium, high], rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
+    "groq:qwen/qwen3.8-27b": {family: qwen, efforts: [], rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
+    # Gemini 2.5 is closed to new API keys (HTTP 404, 2026-10-04); 3.x stable models are free.
+    # The docs don't publish 3.x free limits (AI Studio shows them per project): conservative guesses.
+    "google:gemini-3.8-flash": {family: gemini, efforts: [minimal, low, medium, high], rpm: 10, rpd: 250, tpm: 250000}
+    "google:gemini-3.5-flash-lite": {family: gemini, efforts: [minimal, low, medium, high], rpm: 15, rpd: 1000, tpm: 250000}
+  roles:     # fallback chain; spread across free models so one day's quota covers a full eval run
+    intake: {chain: ["google:gemini-3.5-flash-lite", "groq:openai/gpt-oss-20b"], max_tokens: 900, reasoning_effort: low}
+    coverage: {chain: ["google:gemini-3.8-flash", "groq:openai/gpt-oss-20b"], max_tokens: 1200, reasoning_effort: low}
+    fraud: {chain: ["groq:openai/gpt-oss-20b", "google:gemini-3.5-flash-lite"], max_tokens: 2500, reasoning_effort: low}
+    adjudicator: {chain: ["groq:openai/gpt-oss-120b", "groq:qwen/qwen3.8-27b", "google:gemini-3.8-flash"], max_tokens: 1500, reasoning_effort: low}
+    judge: {chain: ["google:gemini-3.8-flash", "groq:qwen/qwen3.8-27b", "groq:openai/gpt-oss-20b"], max_tokens: 800, reasoning_effort: low}   # never the adjudicator's family (enforced per call)
+    synthetic_generator: {chain: ["google:gemini-3.5-flash-lite", "groq:openai/gpt-oss-20b"], max_tokens: 2500, reasoning_effort: minimal}

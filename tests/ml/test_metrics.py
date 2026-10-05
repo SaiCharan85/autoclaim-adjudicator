@@ -105,3 +105,40 @@ def test_net_savings_per_1k() -> None:
 def test_net_savings_can_be_negative() -> None:
     y = np.zeros(10)
     assert net_savings_per_1k(y, np.arange(10), np.ones(10), 0.5, 100) < 0
+
+
+def test_class_weights_restore_population_rate() -> None:
+    from autoclaim.ml.metrics import class_weights
+
+    y = np.array([1] * 25 + [0] * 75)
+    w = class_weights(y, 0.05)
+    assert np.isclose((w * y).sum() / w.sum(), 0.05)
+    with pytest.raises(ValueError):
+        class_weights(np.zeros(5), 0.05)
+
+
+def test_weighted_recall_matches_unweighted_with_unit_weights() -> None:
+    from autoclaim.ml.metrics import recall_at_budget, weighted_recall_at_budget
+
+    rng = np.random.default_rng(0)
+    y = (rng.random(400) < 0.2).astype(int)
+    s = y + rng.normal(0, 1, 400)
+    assert weighted_recall_at_budget(y, s, np.ones(400), 0.1) == pytest.approx(
+        recall_at_budget(y, s, 0.1)
+    )
+    with pytest.raises(ValueError):
+        weighted_recall_at_budget(y, s, np.ones(400), 0)
+
+
+def test_weighted_report_perfect_and_upweighted_legit() -> None:
+    from autoclaim.ml.metrics import class_weights, weighted_report
+
+    y = np.array([1] * 20 + [0] * 80)
+    perfect = weighted_report(y, y.astype(float), class_weights(y, 0.05), 0.05)
+    assert perfect["roc_auc"] == 1 and perfect["pr_auc"] == pytest.approx(1)
+    assert perfect["recall_at_budget"] == pytest.approx(1, abs=0.01)
+    # random scores: weighted recall@5% should sit near 5%, not near the enriched sample's rate
+    rng = np.random.default_rng(1)
+    y = (np.arange(4000) < 1000).astype(int)
+    rand = weighted_report(y, rng.random(4000), class_weights(y, 0.05), 0.05)
+    assert rand["recall_at_budget"] == pytest.approx(0.05, abs=0.03)

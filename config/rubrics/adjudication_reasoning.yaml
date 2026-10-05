@@ -1,0 +1,21 @@
+# Judge rubric: grades the explanation of a claim decision, never whether the decision is right.
+# Every question is phrased so that "yes" means the explanation passes.
+name: adjudication_reasoning
+version: "1.0"
+instructions: >-
+  You review the written reasoning of an auto insurance claim decision. You get the claim facts,
+  the policy clauses the decision cites (full text), the deterministic numbers, and the decision
+  with its explanation. Do NOT judge whether the outcome is correct; judge only whether the
+  reasoning is faithful, complete and consistent with what you are given. Be strict about
+  unsupported statements and lenient about style.
+items:
+  - id: faithful_to_clauses
+    question: Is every statement about what the policy covers or excludes supported by the text of a cited clause?
+  - id: facts_supported
+    question: Is every claim fact the explanation relies on present in the claim facts (nothing invented)?
+  - id: numbers_consistent
+    question: Do all amounts in the explanation match the deterministic numbers given (deductible, payout, value)?
+  - id: material_facts_addressed
+    question: Does the explanation address every fact that could change coverage (who drove, how the car was used, the cause, police report timing for hit-and-run, late notice)?
+  - id: outcome_consistent
+    question: Does the explanation's conclusion match the stated outcome and reason codes?

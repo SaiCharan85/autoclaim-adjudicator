@@ -73,8 +73,9 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - ruff (lint + format), line length 100.
 
 ## 5b. Leakage and overfitting rules (user requirement; enforced by tests)
-- **First-notice-only features:** every simulator column is tagged `fnol` / `post_fnol` / `ground_truth`;
-  only `fnol` columns may be model features. **The harness never imports the ground-truth oracle.**
+- **First-notice-only features:** every simulator column is tagged `fnol` / `appraisal` / `post_fnol` /
+  `ground_truth`; only `fnol` columns may be stage-1 features; the stage-2 (post-appraisal) fraud
+  model may also use `appraisal` columns (user decision 2026-10-04). **The harness never imports the ground-truth oracle.**
 - **Canaries every training run:** shuffled-label ROC-AUC ≈ 0.5, and flag any single feature with ROC-AUC > 0.9.
 - **Time order:** train on the past, test on the future; every encoder, scaler, vocab and reference fit on train only.
 - **3-way split:** train / validation (all decisions) / **locked test**, touched only with `--final` and
@@ -130,6 +131,12 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 | Profile data | `uv run python scripts/profile_data.py` → `docs/data_profile.md` |
 | Train fraud model | `uv run python scripts/train_fraud.py [--dataset sim_us\|legacy_1990s] [--skip-benchmark]` → validation only |
 | Locked test | `uv run python scripts/train_fraud.py --final` (scores test + holdouts once; appends `docs/test_set_log.md`) |
+| Two-stage fraud triage | `uv run python scripts/fraud_triage.py [--final]` (validation fits + freezes nothing; set `fraud_model.triage.stage2_threshold`) |
+| Fraud lever experiments | `uv run python scripts/fraud_experiments.py --levers repair_cost weighting ensemble grid` (validation only) |
+| Fraud ML vs LLM vs hybrid | `uv run python scripts/fraud_llm_benchmark.py --n 200 [--dry-run] [--final --model groq:openai/gpt-oss-120b]` |
+| Retrieval benchmark | `uv run python scripts/retrieval_benchmark.py` → `docs/retrieval_benchmark.md` |
+| Build claim narratives | `uv run python scripts/build_narratives.py --set eval\|dev --n 300 [--dry-run]` → `data/sim/packages/` |
+| Run claims (smoke) | `uv run python scripts/run_claims.py --set dev --n 3 [--dry-run]` |
 | Run demo | _TBD (Step 9)_ |
 | Run eval | _TBD (Step 8)_ |
 
@@ -139,10 +146,10 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - ☑ Step 2 — Fraud ML (5-model benchmark, CatBoost + SHAP, Isolation Forest, rules, model card)
 - ☑ Step 2b — Real recent data: NHTSA CRSS 2022–24 grounded-hybrid claims, dataset specs, leakage
   canaries, 3-way splits + locked test log, seeds, savings metric (`docs/simulator.md`)
-- ☐ Step 3 — Policy & retrieval (policy YAML, NetworkX graph, BM25 + HNSW + RRF, k-hop, benchmark doc)
-- ☐ Step 4 — Synthetic claims (row-conditioned, red flags, 6 traps, messiness; pilot 50 → full 300–500)
-- ☐ Step 5 — Harness core (state, nodes, edges, checkpointer, router, audit, fallback, budgets, idempotency)
-- ☐ Step 6 — Judge (`Judge` protocol, local rubric adapter, YAML rubrics, planted-error tests)
+- ☑ Step 3 — Policy & retrieval (75-clause policy YAML, NetworkX graph, BM25 + bge-large HNSW + RRF, 1-hop, `docs/retrieval_benchmark.md`)
+- ☑ Step 4 — Synthetic claims (row-conditioned, style cards, traps enriched to 50%; 300 eval + 300 dev)
+- ☑ Step 5 — Harness core (state, nodes, edges, checkpointer, router, audit, fallback, budgets, idempotency; `docs/harness.md`)
+- ◐ Step 6 — Judge (`Judge` protocol + YAML rubric + API judge done; local adapter + judge planted-error eval left)
 - ☐ Step 7 — Memory & oracle (feedback memory, noisy oracle adjuster, interrupt/resume end to end)
 - ☐ Step 7.5 — Fine-tuning on Kaggle (free GPU, QLoRA): intake extractor, small judge, adjudicator
   (distillation). Leakage-safe splits by source row, `finetune` dependency group only, GGUF → Ollama export
@@ -152,13 +159,19 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - ☐ Step 9 — Adjuster console (Streamlit, resume interrupted claims, demo script)
 - ☐ Step 10 — Polish (final README, architecture doc, playbook, CI badge, limitations)
 
+Decisions 2026-10-04: two-stage fraud triage (first notice + independent appraisal) for >= 80% TRUE-fraud
+interception: locked test 78.3% at 10.0% review rate, ROC-AUC 0.860 / 0.955 after the shop-estimate realism fix (model card); one OpenAI-compatible httpx adapter for all providers (no vendor SDKs);
+Gemini 2.5 is closed to new keys, so Gemini 3.x (`gemini-3.8-flash`, `gemini-3.5-flash-lite`);
+roles spread across free models (intake Flash-Lite, coverage/judge Gemini 3.8 Flash, adjudicator
+gpt-oss-120b); a fraud-model lever experiment adopted nothing (model card); free-tier throughput is
+~40–50 harness claims/day (`docs/harness.md`).
 Decisions so far: LLMs = hybrid free (Groq + Google AI Studio free tiers, local Ollama fallback;
 judge from a different model family than the adjudicator), tracing = LangSmith (free Developer tier),
 embeddings = local only: bge-large-en-v1.5 via fastembed (user choice; the retrieval benchmark still
 reports small/base for reference; no API embeddings for now), large batch generation + fine-tuning = Kaggle free GPU notebooks (vLLM / QLoRA), free Colab as overflow
 (GPU jobs must be platform-agnostic and checkpoint often so they can resume after a disconnect).
 
-**Backlog (user: "later")**: repair-cost residual feature for inflated claims (79% of fraud, 37.5% caught);
+**Backlog (user: "later")**: repair-cost residual tested 2026-10-04, not adopted (CI includes 0);
 older real crashes CRSS 2016–2021 for a drift study. Headroom (validation): model at ~55% of the label-noise
 ceiling (PR-AUC 0.418 vs 0.761); vs true fraud, precision@5% = 0.675.
 

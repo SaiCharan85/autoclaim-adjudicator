@@ -23,6 +23,13 @@ class HNSWConfig(BaseModel):
 
 class RetrievalConfig(BaseModel):
     hnsw: HNSWConfig
+    embedding_model: str
+    query_prefix: str = ""  # bge v1.5 retrieval instruction (optional for that model)
+    rrf_k: int = Field(default=60, gt=0)
+    candidates: int = Field(default=20, gt=0)  # per ranker, before fusion
+    top_k: int = Field(default=5, gt=0)
+    graph_hops: int = Field(default=1, ge=0)
+    max_expanded: int = Field(default=6, ge=0)
 
 
 class HarnessConfig(BaseModel):
@@ -56,12 +63,23 @@ class DatasetSplit(BaseModel):
         return self
 
 
+class TriageConfig(BaseModel):
+    """Two-stage fraud triage (docs/fraud_triage.md). The threshold is fitted on validation and
+    frozen here before the locked test is touched."""
+
+    stage2_dataset: str
+    stage1_budget: float = Field(gt=0, lt=1)
+    target_true_recall: float = Field(gt=0, le=1)
+    stage2_threshold: float | None = None  # None until fitted on validation
+
+
 class FraudModelConfig(BaseModel):
     production_dataset: str
     review_budget: float = Field(gt=0, lt=1)
     seeds: list[int] = Field(min_length=1)
     siu_review_cost_usd: float = Field(ge=0)
     datasets: dict[str, DatasetSplit]
+    triage: TriageConfig | None = None
 
     @model_validator(mode="after")
     def _checks(self) -> "FraudModelConfig":
@@ -80,6 +98,50 @@ class JurisdictionProfile(BaseModel):
     total_loss_threshold: float = Field(gt=0, le=1)
 
 
+class ProviderConfig(BaseModel):
+    base_url: str
+    api_key_env: str | None  # None = no key (local Ollama)
+
+
+class ModelLimits(BaseModel):
+    """A model's family (judge must differ from adjudicator) and free-tier limits (None = none)."""
+
+    family: str
+    rpm: int | None = Field(default=None, gt=0)
+    rpd: int | None = Field(default=None, gt=0)
+    tpm: int | None = Field(default=None, gt=0)
+    tpd: int | None = Field(default=None, gt=0)
+    efforts: list[str] = []  # reasoning_effort values it accepts; others are not sent
+
+
+class RoleConfig(BaseModel):
+    chain: list[str] = Field(min_length=1)  # "<provider>:<model id>", tried in order
+    max_tokens: int = Field(gt=0)
+    reasoning_effort: str | None = None
+
+
+class ModelsConfig(BaseModel):
+    safety_margin: float = Field(gt=0, le=1)
+    day_reset_utc_offset_hours: int = Field(ge=-12, le=14)
+    timeout_s: float = Field(gt=0)
+    cache_path: str
+    usage_path: str
+    providers: dict[str, ProviderConfig]
+    catalog: dict[str, ModelLimits]
+    roles: dict[str, RoleConfig]
+
+    @model_validator(mode="after")
+    def _chains_resolve(self) -> "ModelsConfig":
+        for role, rc in self.roles.items():
+            for key in rc.chain:
+                provider, sep, _ = key.partition(":")
+                if not sep or provider not in self.providers:
+                    raise ValueError(f"role {role!r}: {key!r} has no known provider prefix")
+                if key not in self.catalog:
+                    raise ValueError(f"role {role!r}: {key!r} is not in the model catalog")
+        return self
+
+
 class CarrierConfig(BaseModel):
     model_config = ConfigDict(extra="allow")  # sections typed in later steps pass through
 
@@ -89,6 +151,7 @@ class CarrierConfig(BaseModel):
     fraud_model: FraudModelConfig
     jurisdiction: str
     jurisdictions: dict[str, JurisdictionProfile]
+    models: ModelsConfig
 
     @model_validator(mode="after")
     def _known_jurisdiction(self) -> "CarrierConfig":

@@ -166,3 +166,37 @@ def test_normalize_make_unknown() -> None:
     out = crss.normalize_make(pd.Series(["Unknown Make", "Jeep / Kaiser-Jeep / Willys- Jeep"]))
     assert pd.isna(out.iat[0])
     assert out.iat[1] == "Jeep"
+
+
+def test_old_years_fill_names_from_codes(crss_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """2016-2019 files carry codes only and MVIOLATN instead of VIOLATION."""
+    acc = pd.read_csv(crss_dir / "accident.csv").drop(columns=["WEATHERNAME"]).assign(WEATHER=1)
+    veh = pd.read_csv(crss_dir / "vehicle.csv").drop(columns=["MAKENAME", "VPICMODELNAME"])
+    veh = veh.assign(MAKE=49, MAK_MOD=49038)
+    park = pd.read_csv(crss_dir / "parkwork.csv").drop(columns=["PMAKENAME", "PVPICMODELNAME"])
+    park = park.assign(PMAKE=37, PMAK_MOD=37037)
+    viol = pd.read_csv(crss_dir / "violatn.csv").rename(columns={"VIOLATION": "MVIOLATN"})
+    viol = pd.concat([viol, pd.DataFrame([{"CASENUM": 4, "VEH_NO": 1, "MVIOLATN": 97}])])
+    for name, df in (("accident.csv", acc), ("vehicle.csv", veh), ("parkwork.csv", park),
+                     ("violatn.csv", viol)):  # fmt: skip
+        df.to_csv(crss_dir / name, index=False)
+    names = {
+        ("WEATHER", "WEATHERNAME"): {1: "Clear"},
+        ("MAKE", "MAKENAME"): {49: "Toyota"},
+        ("MAK_MOD", "MAK_MODNAME"): {49038: "Toyota Camry (Note: since 1983)"},
+        ("PMAKE", "PMAKENAME"): {37: "Honda"},
+        ("PMAK_MOD", "PMAK_MODNAME"): {37037: "Honda Civic"},
+    }
+    monkeypatch.setattr(crss, "code_names", lambda code, name, file: names[(code, name)])
+    old = crss.load_year(2017, root=crss_dir).set_index("source_record")
+    assert old.loc["crss:2017:1:1", "vehicle_make"] == "Toyota"
+    assert old.loc["crss:2017:1:1", "vehicle_model"] == "Toyota Camry"  # note stripped
+    assert old.loc["crss:2017:5:1", "vehicle_make"] == "Honda"
+    assert (old["weather"] == "clear").all()
+    assert old.loc["crss:2017:1:1", "at_fault"] == 1.0  # MVIOLATN 58 still counts
+
+
+def test_clean_model_name() -> None:
+    s = pd.Series(["Honda Accord (Note: For Crosstour ...)", "Civic", None])
+    out = crss.clean_model_name(s)
+    assert out.iloc[0] == "Honda Accord" and out.iloc[1] == "Civic" and pd.isna(out.iloc[2])

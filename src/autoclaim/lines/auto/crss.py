@@ -11,6 +11,7 @@ User's Manual; the value lists were checked against the 2022-2024 files.
 """
 
 from collections.abc import Sequence
+from functools import cache
 from pathlib import Path
 
 import numpy as np
@@ -43,12 +44,14 @@ PARKED_EVENTS = (12, 14, 45)
 
 DAMAGE_EXTENT = {0: "none", 2: "minor", 4: "functional", 6: "disabling"}  # 7/8/9 -> unknown
 LIGHT = {1: "daylight", 2: "dark", 3: "dark", 6: "dark", 4: "dawn_dusk", 5: "dawn_dusk"}
-TOWED = {5: 0.0, 6: 1.0}
+# 2022+: 5 not towed, 6 towed. 2016-2021 split towing by reason (2, 3, 7): all mean towed.
+TOWED = {5: 0.0, 6: 1.0, 2: 1.0, 3: 1.0, 7: 1.0}
 REGION = {1: "northeast", 2: "midwest", 3: "south", 4: "west"}
 URBANICITY = {1: "urban", 2: "rural"}
 
 # Violations that say nothing about who caused the crash (paperwork, unknown, no driver).
 NON_FAULT_VIOLATIONS = frozenset({0, 71, 72, 74, 75, 76, 83, 95, 99})
+OLD_NOT_REPORTED = 97  # MVIOLATN (2016-2019 CRSS, GES): 'Not Reported'
 
 MAKE_FIXES = {"Nissan/Datsun": "Nissan", "KIA": "Kia", "Mercedes-Benz": "Mercedes-Benz"}
 
@@ -61,7 +64,52 @@ PARKED_COLS = ["CASENUM", "VEH_NO", "PHARM_EV", "PMODYEAR", "PMAKENAME", "PVPICM
 
 
 def _read(path: Path, cols: Sequence[str]) -> pd.DataFrame:
-    return pd.read_csv(path, encoding="latin-1", usecols=list(cols), low_memory=False)
+    """Read the wanted columns that exist (older years lack some *NAME columns; see below)."""
+    have = set(pd.read_csv(path, encoding="latin-1", nrows=0).columns)
+    return pd.read_csv(path, encoding="latin-1", usecols=[c for c in cols if c in have],
+                       low_memory=False)  # fmt: skip
+
+
+# Before 2019 the files carry only NHTSA codes for make, make-model and weather. The codes are one
+# national scheme across years, so names are filled from years that publish both (each code maps
+# to exactly one name in 2019-2024: checked when the maps are built).
+NAMED_YEARS = (2019, 2020, 2021, 2022, 2023, 2024)
+
+
+# Make-model wording changed across years (e.g. spacing, abbreviations); the newest wins.
+LATEST_WORDING_WINS = frozenset({"MAK_MODNAME", "PMAK_MODNAME"})
+
+
+@cache
+def code_names(code_col: str, name_col: str, file: str) -> dict[int, str]:
+    pairs = []
+    for year in NAMED_YEARS:  # oldest first, so a later year's wording overwrites
+        path = raw_dir(f"crss_{year}") / file
+        if not path.exists():
+            continue
+        have = set(pd.read_csv(path, encoding="latin-1", nrows=0).columns)
+        if {code_col, name_col} <= have:
+            pairs.append(pd.read_csv(path, usecols=[code_col, name_col], encoding="latin-1"))
+    if not pairs:
+        raise FileNotFoundError(f"no CRSS year with {name_col} to build the code map from")
+    df = pd.concat(pairs).dropna().drop_duplicates()
+    if name_col in LATEST_WORDING_WINS:
+        df = df.drop_duplicates(subset=code_col, keep="last")
+    elif df[code_col].duplicated().any():
+        raise ValueError(f"{code_col} -> {name_col} is not one-to-one across {NAMED_YEARS}")
+    return dict(zip(df[code_col].astype(int), df[name_col].astype(str), strict=True))
+
+
+def clean_model_name(names: pd.Series) -> pd.Series:
+    """'Honda Accord (Note: For Crosstour ...)' -> 'Honda Accord' (drop NHTSA editorial notes)."""
+    return names.astype("string").str.replace(r"\s*\(.*$", "", regex=True).str.strip()
+
+
+def _fill_names(df: pd.DataFrame, pairs: Sequence[tuple[str, str, str]]) -> pd.DataFrame:
+    for code_col, name_col, file in pairs:
+        if name_col not in df and code_col in df:
+            df[name_col] = df[code_col].map(code_names(code_col, name_col, file))
+    return df
 
 
 def normalize_make(names: pd.Series) -> pd.Series:
@@ -112,10 +160,27 @@ def _at_fault(violations: pd.DataFrame) -> pd.Series:
 def load_year(year: int, root: Path | None = None, seed: int = 0) -> pd.DataFrame:
     """Real claimant incidents for one CRSS year (vehicles in transport + struck parked)."""
     base = root if root is not None else raw_dir(f"crss_{year}")
-    acc = _read(base / "accident.csv", ACCIDENT_COLS)
-    veh = _read(base / "vehicle.csv", VEHICLE_COLS)
-    park = _read(base / "parkwork.csv", PARKED_COLS)
-    viol = _read(base / "violatn.csv", ["CASENUM", "VEH_NO", "VIOLATION"])
+    acc = _fill_names(
+        _read(base / "accident.csv", [*ACCIDENT_COLS, "WEATHER"]),
+        [("WEATHER", "WEATHERNAME", "accident.csv")],
+    )
+    veh = _fill_names(
+        _read(base / "vehicle.csv", [*VEHICLE_COLS, "MAKE", "MAK_MOD"]),
+        [("MAKE", "MAKENAME", "vehicle.csv"), ("MAK_MOD", "MAK_MODNAME", "vehicle.csv")],
+    )
+    park = _fill_names(
+        _read(base / "parkwork.csv", [*PARKED_COLS, "PMAKE", "PMAK_MOD"]),
+        [("PMAKE", "PMAKENAME", "parkwork.csv"), ("PMAK_MOD", "PMAK_MODNAME", "parkwork.csv")],
+    )
+    # vPIC model names start in 2020; earlier years use NHTSA's make-model names
+    if "VPICMODELNAME" not in veh:
+        veh["VPICMODELNAME"] = clean_model_name(veh["MAK_MODNAME"])
+    if "PVPICMODELNAME" not in park:
+        park["PVPICMODELNAME"] = clean_model_name(park["PMAK_MODNAME"])
+    viol = _read(base / "violatn.csv", ["CASENUM", "VEH_NO", "VIOLATION", "MVIOLATN"])
+    if "VIOLATION" not in viol:  # before 2020: same codes as MVIOLATN, plus 97 = not reported
+        viol = viol.rename(columns={"MVIOLATN": "VIOLATION"})
+        viol = viol[viol["VIOLATION"] != OLD_NOT_REPORTED]
 
     fled_cases = set(veh.loc[veh["HIT_RUN"] == 1, "CASENUM"])
     fault = _at_fault(viol)

@@ -21,7 +21,15 @@ def test_real_config_loads_typed_sections() -> None:
     assert fm.production_dataset == "sim_us"
     assert fm.review_budget == 0.05
     assert len(fm.seeds) == 3
-    assert set(fm.datasets) == {"sim_us", "legacy_1990s"}
+    assert set(fm.datasets) == {
+        "sim_us",
+        "sim_us_appraisal",
+        "sim_decades",
+        "sim_decades_appraisal",
+        "legacy_1990s",
+    }
+    assert fm.triage is not None and fm.triage.stage2_dataset in fm.datasets
+    assert fm.triage.stage2_threshold is not None  # frozen before the locked test
     assert set(fm.datasets["legacy_1990s"].sensitive_features) == {"Sex", "MaritalStatus"}
     assert cfg.active_jurisdiction.late_notice_days == 30
 
@@ -29,7 +37,7 @@ def test_real_config_loads_typed_sections() -> None:
 def test_untyped_sections_pass_through() -> None:
     cfg = load_carrier_config()
     assert cfg.model_extra is not None
-    assert "models" in cfg.model_extra
+    assert "deductibles" in cfg.model_extra
 
 
 def test_custom_path(tmp_path: Path) -> None:
@@ -101,4 +109,20 @@ def test_missing_required_section_rejected(tmp_path: Path) -> None:
     path = tmp_path / "c.yaml"
     path.write_text(yaml.safe_dump(raw), encoding="utf-8")
     with pytest.raises(ValidationError):
+        load_carrier_config(path)
+
+
+def test_models_section_typed_and_judge_differs_from_adjudicator() -> None:
+    m = load_carrier_config().models
+    first = {role: m.catalog[rc.chain[0]].family for role, rc in m.roles.items()}
+    assert first["judge"] != first["adjudicator"]
+    assert all(rc.max_tokens > 0 for rc in m.roles.values())
+
+
+def test_models_chain_must_resolve(tmp_path: Path) -> None:
+    raw = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+    raw["models"]["roles"]["judge"]["chain"] = ["groq:not-in-catalog"]
+    path = tmp_path / "c.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(ValueError, match="catalog"):
         load_carrier_config(path)

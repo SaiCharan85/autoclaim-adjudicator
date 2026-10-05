@@ -13,6 +13,7 @@ class Availability(StrEnum):
     ID = "id"  # identifiers: never features
     PROVENANCE = "provenance"  # where the row came from: never features (would leak real-vs-sim)
     FNOL = "fnol"
+    APPRAISAL = "appraisal"  # known after the independent appraisal, before payment
     POST_FNOL = "post_fnol"  # known only after investigation (e.g. confirmed fraud = the label)
     GROUND_TRUTH = "ground_truth"  # simulation truth, never knowable by an insurer
 
@@ -33,12 +34,17 @@ _FNOL = (
     "expected_log_amount", "amount_residual",
 )  # fmt: skip
 
+# Known after the independent appraisal (stage-2 fraud model only), plus features derived from them.
+_APPRAISAL = ("appraised_amount", "appraiser_prior_damage", "claim_to_appraisal",
+              "log_claim_to_appraisal")  # fmt: skip
+
 AVAILABILITY: dict[str, Availability] = {
     "claim_id": Availability.ID,
     "policy_id": Availability.ID,
     "record_origin": Availability.PROVENANCE,
     "source_record": Availability.PROVENANCE,
     "fraud_confirmed": Availability.POST_FNOL,
+    **dict.fromkeys(_APPRAISAL, Availability.APPRAISAL),
     **dict.fromkeys(_FNOL, Availability.FNOL),
 }
 
@@ -60,3 +66,17 @@ def assert_fnol_only(features: Iterable[str]) -> None:
     bad = {f: availability(f).value for f in features if availability(f) is not Availability.FNOL}
     if bad:
         raise LeakageError(f"non-FNOL columns used as features: {bad}")
+
+
+STAGE_ALLOWED: dict[str, frozenset[Availability]] = {
+    "fnol": frozenset({Availability.FNOL}),
+    "appraisal": frozenset({Availability.FNOL, Availability.APPRAISAL}),
+}
+
+
+def assert_stage_features(features: Iterable[str], stage: str) -> None:
+    """Raise if a feature is not known at `stage` (fnol = first notice; appraisal = after it)."""
+    allowed = STAGE_ALLOWED[stage]
+    bad = {f: availability(f).value for f in features if availability(f) not in allowed}
+    if bad:
+        raise LeakageError(f"columns not known at stage {stage!r} used as features: {bad}")

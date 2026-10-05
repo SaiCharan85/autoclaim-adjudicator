@@ -3,7 +3,7 @@
 rules can be checked against real labels.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -11,11 +11,12 @@ import pandas as pd
 from autoclaim.config import DatasetSplit, FraudModelConfig
 from autoclaim.datasets import vehicle_fraud
 from autoclaim.lines.auto.simulator import build as sim_build
-from autoclaim.lines.auto.simulator.columns import assert_fnol_only
+from autoclaim.lines.auto.simulator.columns import assert_fnol_only, assert_stage_features
 from autoclaim.ml import features as legacy
 from autoclaim.ml.frame import AMOUNT, T, Y
 from autoclaim.ml.spec import DatasetSpec, Frames
 from autoclaim.ml.stages import ExpectedAmountStage
+from autoclaim.paths import data_dir
 
 EPOCH = pd.Timestamp("1970-01-01")
 
@@ -90,6 +91,35 @@ def split_by_date(split: DatasetSplit) -> Callable[[pd.DataFrame], Frames]:
         )
 
     return _split
+
+
+# ---------------------------------------------------------------- stage 2: after the appraisal
+
+
+def sim_appraisal_features(raw: pd.DataFrame) -> pd.DataFrame:
+    """First-notice features + what the independent appraisal adds. The estimate audit signal is
+    log(claimed / appraised): > 0 means the shop asks more than the appraiser found."""
+    out = sim_features(raw)
+    nan = pd.Series(np.nan, index=raw.index)
+    appraised = pd.to_numeric(raw.get("appraised_amount", nan), errors="coerce")
+    claimed = pd.to_numeric(out["claimed_amount"], errors="coerce")
+    out["appraised_amount"] = appraised
+    flag = raw.get("appraiser_prior_damage", nan)
+    out["appraiser_prior_damage"] = pd.to_numeric(flag, errors="coerce").astype("float64")
+    out["log_claim_to_appraisal"] = np.log(claimed / appraised)
+    return out
+
+
+def sim_appraisal_prepare(raw: pd.DataFrame) -> pd.DataFrame:
+    frame = sim_appraisal_features(raw)
+    frame[Y] = raw["fraud_confirmed"].astype(int)
+    frame[T] = (pd.to_datetime(raw["loss_date"]) - EPOCH).dt.days
+    frame[AMOUNT] = raw["claimed_amount"].astype("float64")
+    return frame
+
+
+def _check_appraisal_stage(features: Sequence[str]) -> None:
+    assert_stage_features(features, "appraisal")
 
 
 # What a repair usually costs depends on these first-notice facts (not on who is claiming).
@@ -193,6 +223,35 @@ def get_spec(name: str, cfg: FraudModelConfig) -> DatasetSpec:
             check_features=assert_fnol_only,
             load_holdouts=_sim_holdouts,
             stage_factories={"repair_cost": repair_cost_stage},
+        )
+    if name in ("sim_decades", "sim_decades_appraisal"):
+        stage2 = name.endswith("_appraisal")
+        return DatasetSpec(
+            name=name,
+            description="Multi-decade world 2002-2024: real GES/CRSS crashes, BLS-priced, "
+            "simulated policy/fraud" + (" + appraisal (stage 2)" if stage2 else ""),
+            real_labels=False,
+            load_raw=lambda: sim_build.load("claims", data_dir() / "sim_decades"),
+            features_frame=sim_appraisal_features if stage2 else sim_features,
+            prepare=sim_appraisal_prepare if stage2 else sim_prepare,
+            canonical=sim_features,
+            split=split_by_date(split),
+            sensitive=tuple(split.sensitive_features),
+            check_features=_check_appraisal_stage if stage2 else assert_fnol_only,
+        )
+    if name == "sim_us_appraisal":
+        return DatasetSpec(
+            name=name,
+            description="Stage 2 (after the independent appraisal): sim_us + appraisal features",
+            real_labels=False,
+            load_raw=lambda: sim_build.load("claims"),
+            features_frame=sim_appraisal_features,
+            prepare=sim_appraisal_prepare,
+            canonical=sim_features,
+            split=split_by_date(split),
+            sensitive=tuple(split.sensitive_features),
+            check_features=_check_appraisal_stage,
+            load_holdouts=_sim_holdouts,
         )
     if name == "legacy_1990s":
         return DatasetSpec(

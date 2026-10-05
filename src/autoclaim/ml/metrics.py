@@ -100,3 +100,45 @@ def score_report(y_true: ArrayLike, scores: ArrayLike, budget: float) -> dict[st
         "precision_at_budget": precision_at_budget(y, scores, budget),
         "base_rate": float(y.mean()),
     }
+
+
+# ---------------------------------------------------------------- stratified samples
+# When frauds are over-sampled (e.g. 25% in an LLM benchmark vs ~6% in reality), weight each claim
+# by (population share / sample share) of its class so budget metrics describe the real mix.
+
+
+def class_weights(y_true: ArrayLike, population_rate: float) -> np.ndarray:
+    y = np.asarray(y_true)
+    sample_rate = float(y.mean())
+    if not 0 < sample_rate < 1:
+        raise ValueError("the sample needs both classes")
+    return np.where(
+        y == 1, population_rate / sample_rate, (1 - population_rate) / (1 - sample_rate)
+    )
+
+
+def weighted_recall_at_budget(
+    y_true: ArrayLike, scores: ArrayLike, weights: ArrayLike, budget: float
+) -> float:
+    """Recall within the top `budget` share of the (weighted) population, highest scores first."""
+    y, s, w = np.asarray(y_true), np.asarray(scores, dtype=float), np.asarray(weights, dtype=float)
+    if not 0 < budget <= 1:
+        raise ValueError("budget must be in (0, 1]")
+    order = np.argsort(-s, kind="stable")
+    cum = np.cumsum(w[order])
+    reviewed = order[cum <= budget * w.sum() + 1e-9]
+    if len(reviewed) == 0:
+        reviewed = order[:1]
+    fraud_w = float((w * y).sum())
+    return float((w[reviewed] * y[reviewed]).sum() / fraud_w) if fraud_w else float("nan")
+
+
+def weighted_report(
+    y_true: ArrayLike, scores: ArrayLike, weights: ArrayLike, budget: float
+) -> dict[str, float]:
+    y, s, w = np.asarray(y_true), np.asarray(scores, dtype=float), np.asarray(weights, dtype=float)
+    return {
+        "roc_auc": float(roc_auc_score(y, s)),  # prevalence-free: identical with or without weights
+        "pr_auc": float(average_precision_score(y, s, sample_weight=w)),
+        "recall_at_budget": weighted_recall_at_budget(y, s, w, budget),
+    }

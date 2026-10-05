@@ -1,0 +1,245 @@
+# Labeled queries for the retrieval benchmark. Written to resemble what the coverage node asks.
+# relevant: clauses a correct coverage decision must see (2-5 ids).
+# direct:   subset of relevant that a good search should find from the query text alone; the rest
+#           should be reachable through policy-graph edges (1-2 hops) from a direct clause.
+queries:
+  - id: q01
+    query: "Deer ran onto the highway at night and hit the front of the car; bumper and headlight damaged."
+    relevant: [INS-COMPREHENSIVE, DEF-COLLISION]
+    direct: [INS-COMPREHENSIVE]
+  - id: q02
+    query: "Rear-ended at a red light by another car, trunk and bumper crushed."
+    relevant: [INS-COLLISION, DEF-COLLISION, LIM-DEDUCTIBLE]
+    direct: [INS-COLLISION, DEF-COLLISION, LIM-DEDUCTIBLE]
+  - id: q03
+    query: "Is a loss under the deductible paid?"
+    relevant: [LIM-LOSS-BELOW-DEDUCTIBLE, DEF-DEDUCTIBLE]
+    direct: [LIM-LOSS-BELOW-DEDUCTIBLE, DEF-DEDUCTIBLE]
+  - id: q04
+    query: "somebody keyed my car at the mall lot, long scratches down both doors"
+    relevant: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION]
+    direct: [INS-COMPREHENSIVE]
+  - id: q05
+    query: "Hailstorm last night left dents all over the hood and roof, which deductible?"
+    relevant: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION, LIM-DEDUCTIBLE]
+    direct: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION, LIM-DEDUCTIBLE]
+  - id: q06
+    query: "Busted windshield from a rock kicked up by a truck - can it just be repaired with no deductible?"
+    relevant: [INS-GLASS-BREAKAGE, LIM-GLASS-REPAIR-WAIVER]
+    direct: [INS-GLASS-BREAKAGE, LIM-GLASS-REPAIR-WAIVER]
+  - id: q07
+    query: "Engine blew on the interstate. No accident, just smoke and a loud bang, car won't start."
+    relevant: [EXC-MECHANICAL-BREAKDOWN, INS-RESULTING-LOSS]
+    direct: [EXC-MECHANICAL-BREAKDOWN]
+  - id: q08
+    query: "Car was stolen from my driveway overnight, I filed a police report this morning."
+    relevant: [INS-COMPREHENSIVE, COND-THEFT-POLICE-REPORT]
+    direct: [INS-COMPREHENSIVE, COND-THEFT-POLICE-REPORT]
+  - id: q09
+    query: "Got carjacked at a gas station. Do I have to tell the cops before you'll pay?"
+    relevant: [COND-THEFT-POLICE-REPORT, INS-COMPREHENSIVE]
+    direct: [COND-THEFT-POLICE-REPORT]
+  - id: q10
+    query: "I need a rental car while mine is stolen, how much do you cover per day?"
+    relevant: [INS-TRANSPORTATION-EXPENSES, COND-THEFT-POLICE-REPORT]
+    direct: [INS-TRANSPORTATION-EXPENSES]
+  - id: q11
+    query: "Was driving for Uber with the app on, waiting for a ping, when a van sideswiped me."
+    relevant: [EXC-COMMERCIAL-USE, END-RIDESHARE, DEF-TNC-ACTIVITY, INS-COLLISION]
+    direct: [EXC-COMMERCIAL-USE]
+  - id: q12
+    query: "DoorDash order in the back seat when I hit a pole; no rideshare endorsement on the policy."
+    relevant: [EXC-COMMERCIAL-USE, DEF-TNC-ACTIVITY, END-RIDESHARE]
+    direct: [EXC-COMMERCIAL-USE, DEF-TNC-ACTIVITY, END-RIDESHARE]
+  - id: q13
+    query: "Does the rideshare endorsement cover me while I'm heading to pick up a passenger?"
+    relevant: [END-RIDESHARE, EXC-COMMERCIAL-USE]
+    direct: [END-RIDESHARE]
+  - id: q14
+    query: "my son's friend was driving the car with permission and backed into a mailbox, he isn't on our policy"
+    relevant: [INS-PERMISSIVE-USE, DEF-PERMISSIVE-USER, DEC-LISTED-DRIVERS]
+    direct: [INS-PERMISSIVE-USE, DEF-PERMISSIVE-USER, DEC-LISTED-DRIVERS]
+  - id: q15
+    query: "Driver who is named as excluded on the dec page crashed the car into a fence."
+    relevant: [EXC-EXCLUDED-DRIVER, DEF-EXCLUDED-DRIVER]
+    direct: [EXC-EXCLUDED-DRIVER, DEF-EXCLUDED-DRIVER]
+  - id: q16
+    query: "Brother-in-law we had to exclude after his DUI borrowed the car and rolled it, it was an emergency."
+    relevant: [EXC-EXCLUDED-DRIVER, DEF-EXCLUDED-DRIVER, INS-COLLISION]
+    direct: [EXC-EXCLUDED-DRIVER, DEF-EXCLUDED-DRIVER, INS-COLLISION]
+  - id: q17
+    query: "Only carry liability on my old truck and a tree fell on it in a storm. Am I covered?"
+    relevant: [DEC-LIABILITY-ONLY, INS-COMPREHENSIVE]
+    direct: [DEC-LIABILITY-ONLY]
+  - id: q18
+    query: "Car was totaled in the wreck - repair estimate is 80% of what it's worth."
+    relevant: [DEF-TOTAL-LOSS, LIM-TOTAL-LOSS, DEF-ACTUAL-CASH-VALUE]
+    direct: [DEF-TOTAL-LOSS, LIM-TOTAL-LOSS, DEF-ACTUAL-CASH-VALUE]
+  - id: q19
+    query: "How do you figure out what my car is worth for a total loss payout?"
+    relevant: [DEF-ACTUAL-CASH-VALUE, LIM-TOTAL-LOSS]
+    direct: [DEF-ACTUAL-CASH-VALUE, LIM-TOTAL-LOSS]
+  - id: q20
+    query: "There's a lienholder on the car, who gets the check if it's a total?"
+    relevant: [PAY-LOSS-PAYEE, LIM-TOTAL-LOSS]
+    direct: [PAY-LOSS-PAYEE]
+  - id: q21
+    query: "someone smashed my parked car and drove off, i only called the police two days later"
+    relevant: [INS-HIT-AND-RUN, DEF-HIT-AND-RUN-VEHICLE, COND-HIT-AND-RUN-POLICE-REPORT]
+    direct: [INS-HIT-AND-RUN, DEF-HIT-AND-RUN-VEHICLE]
+  - id: q22
+    query: "What deductible applies to a hit-and-run claim?"
+    relevant: [INS-HIT-AND-RUN, LIM-DEDUCTIBLE]
+    direct: [INS-HIT-AND-RUN, LIM-DEDUCTIBLE]
+  - id: q23
+    query: "Came back to the garage and found a dent with paint transfer, no note left by whoever did it."
+    relevant: [DEF-HIT-AND-RUN-VEHICLE, INS-HIT-AND-RUN, COND-HIT-AND-RUN-POLICE-REPORT]
+    direct: [DEF-HIT-AND-RUN-VEHICLE]
+  - id: q24
+    query: "Reported the fender bender 45 days after it happened - is the claim dead?"
+    relevant: [COND-LATE-NOTICE, COND-NOTICE-OF-LOSS]
+    direct: [COND-LATE-NOTICE, COND-NOTICE-OF-LOSS]
+  - id: q25
+    query: "Claimant waited two months to tell us and already had the car fixed at a buddy's shop."
+    relevant: [COND-LATE-NOTICE, COND-INSPECTION-BEFORE-REPAIR, COND-NOTICE-OF-LOSS]
+    direct: [COND-LATE-NOTICE, COND-INSPECTION-BEFORE-REPAIR, COND-NOTICE-OF-LOSS]
+  - id: q26
+    query: "Car caught fire in the garage overnight, total burn-out."
+    relevant: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION]
+    direct: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION]
+  - id: q27
+    query: "Swerved to miss a deer and slid into the guardrail, never touched the deer."
+    relevant: [DEF-COLLISION, INS-COLLISION]
+    direct: [DEF-COLLISION, INS-COLLISION]
+  - id: q28
+    query: "Tire blew out after hitting a pothole, only the tire is damaged."
+    relevant: [EXC-ROAD-DAMAGE-TIRES, INS-RESULTING-LOSS]
+    direct: [EXC-ROAD-DAMAGE-TIRES, INS-RESULTING-LOSS]
+  - id: q29
+    query: "Radiator cracked when the coolant froze during the cold snap."
+    relevant: [EXC-FREEZING, INS-RESULTING-LOSS]
+    direct: [EXC-FREEZING, INS-RESULTING-LOSS]
+  - id: q30
+    query: "Transmission died, but only after a crash cracked the housing - is the breakdown covered?"
+    relevant: [INS-RESULTING-LOSS, EXC-MECHANICAL-BREAKDOWN, INS-COLLISION]
+    direct: [INS-RESULTING-LOSS, EXC-MECHANICAL-BREAKDOWN]
+  - id: q31
+    query: "Rust and peeling paint on the rocker panels, covered?"
+    relevant: [EXC-WEAR-AND-TEAR, INS-RESULTING-LOSS]
+    direct: [EXC-WEAR-AND-TEAR, INS-RESULTING-LOSS]
+  - id: q32
+    query: "Took the car to a track day at the speedway and spun into the wall."
+    relevant: [EXC-RACING, INS-COLLISION]
+    direct: [EXC-RACING, INS-COLLISION]
+  - id: q33
+    query: "Insured admits he set the car on fire himself to get out of the loan."
+    relevant: [EXC-INTENTIONAL-DAMAGE, GEN-FRAUD]
+    direct: [EXC-INTENTIONAL-DAMAGE, GEN-FRAUD]
+  - id: q34
+    query: "Repair invoice looks padded - shop billed for parts never installed. What are our options?"
+    relevant: [GEN-FRAUD, COND-PROOF-OF-LOSS-EUO]
+    direct: [GEN-FRAUD]
+  - id: q35
+    query: "Can we require the claimant to sit for an examination under oath and send a sworn statement?"
+    relevant: [COND-PROOF-OF-LOSS-EUO, COND-COOPERATION]
+    direct: [COND-PROOF-OF-LOSS-EUO, COND-COOPERATION]
+  - id: q36
+    query: "Laptop and golf clubs taken out of the trunk during a break-in."
+    relevant: [EXC-PERSONAL-PROPERTY, INS-COMPREHENSIVE]
+    direct: [EXC-PERSONAL-PROPERTY, INS-COMPREHENSIVE]
+  - id: q37
+    query: "Aftermarket rims and a lift kit worth $6,000 destroyed in the crash."
+    relevant: [EXC-CUSTOM-EQUIPMENT, DEF-CUSTOM-EQUIPMENT, END-CUSTOM-EQUIPMENT-SCHEDULE]
+    direct: [EXC-CUSTOM-EQUIPMENT, DEF-CUSTOM-EQUIPMENT]
+  - id: q38
+    query: "Garmin GPS suction-mounted on the dash got stolen along with my phone."
+    relevant: [EXC-ELECTRONIC-EQUIPMENT, EXC-PERSONAL-PROPERTY]
+    direct: [EXC-ELECTRONIC-EQUIPMENT, EXC-PERSONAL-PROPERTY]
+  - id: q39
+    query: "Car is worth less after repairs because Carfax shows the accident; will you pay the difference?"
+    relevant: [EXC-DIMINUTION-IN-VALUE, LIM-LIMIT-OF-LIABILITY]
+    direct: [EXC-DIMINUTION-IN-VALUE, LIM-LIMIT-OF-LIABILITY]
+  - id: q40
+    query: "Police impounded the car after my nephew's arrest and the city won't release it."
+    relevant: [EXC-CONFISCATION, INS-COMPREHENSIVE]
+    direct: [EXC-CONFISCATION]
+  - id: q41
+    query: "Windshield cracked in the crash - can it go under comp instead of collision?"
+    relevant: [INS-GLASS-BREAKAGE, LIM-DEDUCTIBLE, LIM-GLASS-REPAIR-WAIVER]
+    direct: [INS-GLASS-BREAKAGE]
+  - id: q42
+    query: "Lane-keep camera needs recalibration after the new windshield, is that part of the claim?"
+    relevant: [LIM-ADAS-RECALIBRATION, DEF-ADAS, INS-GLASS-BREAKAGE]
+    direct: [LIM-ADAS-RECALIBRATION, DEF-ADAS, INS-GLASS-BREAKAGE]
+  - id: q43
+    query: "Borrowed my friend's car and backed it into a pole. Does my policy pay or his?"
+    relevant: [INS-NON-OWNED-AUTO, DEF-NON-OWNED-AUTO, COND-OTHER-INSURANCE]
+    direct: [INS-NON-OWNED-AUTO, DEF-NON-OWNED-AUTO]
+  - id: q44
+    query: "Rental car got dinged on vacation and the rental company wants loss-of-use charges."
+    relevant: [LIM-NON-OWNED-AUTO, INS-NON-OWNED-AUTO]
+    direct: [LIM-NON-OWNED-AUTO, INS-NON-OWNED-AUTO]
+  - id: q45
+    query: "Bought a new SUV last week and wrecked it before I called to add it."
+    relevant: [DEF-NEWLY-ACQUIRED-AUTO, DEF-YOUR-COVERED-AUTO]
+    direct: [DEF-NEWLY-ACQUIRED-AUTO, DEF-YOUR-COVERED-AUTO]
+  - id: q46
+    query: "My car's in the shop so I'm driving the dealer's loaner, and it got hailed on."
+    relevant: [DEF-TEMPORARY-SUBSTITUTE-AUTO, INS-COMPREHENSIVE, COND-OTHER-INSURANCE]
+    direct: [DEF-TEMPORARY-SUBSTITUTE-AUTO]
+  - id: q47
+    query: "Accident happened in Mexico on a road trip."
+    relevant: [GEN-POLICY-TERRITORY, INS-PHYSICAL-DAMAGE]
+    direct: [GEN-POLICY-TERRITORY]
+  - id: q48
+    query: "Date of loss is three days before the policy started."
+    relevant: [GEN-POLICY-PERIOD, INS-PHYSICAL-DAMAGE]
+    direct: [GEN-POLICY-PERIOD]
+  - id: q49
+    query: "I disagree with your valuation of my car. How do I dispute the number?"
+    relevant: [COND-APPRAISAL, DEF-ACTUAL-CASH-VALUE]
+    direct: [COND-APPRAISAL, DEF-ACTUAL-CASH-VALUE]
+  - id: q50
+    query: "Other driver was at fault - do I get my deductible back if you collect from them?"
+    relevant: [COND-SUBROGATION, LIM-DEDUCTIBLE]
+    direct: [COND-SUBROGATION]
+  - id: q51
+    query: "stolen car turned up a week later stripped of its wheels"
+    relevant: [PAY-STOLEN-VEHICLE-RECOVERY, INS-COMPREHENSIVE]
+    direct: [PAY-STOLEN-VEHICLE-RECOVERY]
+  - id: q52
+    query: "Can I keep my totaled car instead of handing it over to you?"
+    relevant: [PAY-SALVAGE, LIM-TOTAL-LOSS]
+    direct: [PAY-SALVAGE, LIM-TOTAL-LOSS]
+  - id: q53
+    query: "Do you pay cash or fix the car? Can I pick my own body shop?"
+    relevant: [PAY-PAYMENT-OF-LOSS, LIM-LIMIT-OF-LIABILITY]
+    direct: [PAY-PAYMENT-OF-LOSS, LIM-LIMIT-OF-LIABILITY]
+  - id: q54
+    query: "Collision deductible is $1,000 and comp is $250 - which one comes off a deer strike?"
+    relevant: [DEC-DEDUCTIBLES, LIM-DEDUCTIBLE, DEF-COLLISION]
+    direct: [DEC-DEDUCTIBLES, LIM-DEDUCTIBLE]
+  - id: q55
+    query: "Teenage daughter lives at home but isn't on the policy, scraped the car on a pillar."
+    relevant: [DEF-FAMILY-MEMBER, DEC-LISTED-DRIVERS, DEF-INSURED]
+    direct: [DEF-FAMILY-MEMBER, DEC-LISTED-DRIVERS]
+  - id: q56
+    query: "Guy took my keys off the counter without asking and crashed it."
+    relevant: [EXC-NO-REASONABLE-BELIEF, INS-PERMISSIVE-USE]
+    direct: [EXC-NO-REASONABLE-BELIEF, INS-PERMISSIVE-USE]
+  - id: q57
+    query: "River overflowed and flood water got into the interior and engine."
+    relevant: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION]
+    direct: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION]
+  - id: q58
+    query: "Car flipped over on an icy off-ramp, single vehicle."
+    relevant: [INS-COLLISION, DEF-COLLISION]
+    direct: [INS-COLLISION, DEF-COLLISION]
+  - id: q59
+    query: "Car died on the shoulder and I paid for a tow - does roadside pay for that?"
+    relevant: [END-ROADSIDE-ASSISTANCE, EXC-MECHANICAL-BREAKDOWN]
+    direct: [END-ROADSIDE-ASSISTANCE]
+  - id: q60
+    query: "Riot downtown, protesters smashed the windows and set the hood on fire."
+    relevant: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION, EXC-WAR-NUCLEAR]
+    direct: [INS-COMPREHENSIVE, DEF-OTHER-THAN-COLLISION, EXC-WAR-NUCLEAR]

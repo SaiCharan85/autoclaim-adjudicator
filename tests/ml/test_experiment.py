@@ -6,7 +6,15 @@ import pytest
 
 from autoclaim.config import FraudModelConfig
 from autoclaim.ml import models
-from autoclaim.ml.experiment import LEVERS, Variant, compare, run_variant
+from autoclaim.ml.experiment import (
+    LEVERS,
+    REPAIR_COST,
+    Variant,
+    VariantResult,
+    compare,
+    references_present,
+    run_variant,
+)
 from autoclaim.ml.frame import AMOUNT, WEIGHT, feature_list
 from autoclaim.ml.stages import ExpectedAmountStage
 
@@ -88,3 +96,13 @@ def test_unsupported_weights_raise(fraud_std: pd.DataFrame, name: str) -> None:
 def test_xgboost_accepts_weights(fraud_std: pd.DataFrame) -> None:
     weighted = fraud_std.assign(**{WEIGHT: 1.0})
     assert models.make_model("xgboost", feature_list(fraud_std), 0).fit(weighted, None).n_trees
+
+
+def test_references_present_keeps_order_and_skips_missing() -> None:
+    def res(name: str) -> VariantResult:
+        return VariantResult(Variant(name), pd.DataFrame(), np.zeros(1))
+
+    results = [res("baseline"), res(REPAIR_COST), res("other")]
+    assert references_present(results, [REPAIR_COST, "baseline"]) == [REPAIR_COST, "baseline"]
+    assert references_present(results[:1], ["baseline", REPAIR_COST]) == ["baseline"]
+    assert references_present(results, ["nope"]) == []

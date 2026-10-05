@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from autoclaim.datasets import download as dl
-from autoclaim.datasets.sources import CRSS, DatasetSource, UrlSource
+from autoclaim.datasets.sources import CRSS, CRSS_YEARS, DatasetSource, UrlSource
 
 SOURCE = DatasetSource(
     key="toy", kaggle_ref="owner/toy", files=("a.csv", "b.csv"), description="toy"
@@ -249,7 +249,8 @@ def test_legacy_kaggle_manifest_still_loads(tmp_path: Path) -> None:
 
 
 def test_crss_registry_covers_recent_years() -> None:
-    assert set(CRSS) == {2022, 2023, 2024}
+    assert set(CRSS) == set(range(2016, 2025))  # 2022-24 production pool + 2016-21 drift study
+    assert set(CRSS_YEARS) == {2022, 2023, 2024}
     for year, src in CRSS.items():
         assert src.url.endswith(f"/CRSS/{year}/CRSS{year}CSV.zip")
         assert "Public domain" in src.license

@@ -72,6 +72,41 @@ Fraud is also likelier soon after the policy starts and after a recent address c
 fraud is confirmed by investigators. **Models train on the confirmed label; evaluations use the
 true one.**
 
+## Calibration to real 2024 figures (2026-10-04)
+Several amount dials were assumptions. They are now fitted (`scripts/calibrate_world.py`,
+[calibration.md](calibration.md)) to cited real figures (`config/calibration_sources.yaml`):
+
+| 2024, approved claims | Before | After | Real |
+|---|---|---|---|
+| Average paid collision claim | $4,887 | $5,190 | $5,489 (III, ISO/Verisk) |
+| Average paid comprehensive claim | $4,379 | $2,104 | $2,306 (III, ISO/Verisk) |
+| Total-loss share | 14% | 21% | ~23% (CCC) |
+
+What changed:
+- **Theft recovery:** half of stolen cars are recovered and repaired, not written off.
+- **Comprehensive mix:** a smaller theft share (3%, was 5%), a larger glass share (17%, was 15%).
+- **Repair costs:** collision repair costs ×1.4 with a wider spread, comprehensive ×0.7.
+- **Depreciation:** cars lose 15% of their value a year (was 12%), so older cheap cars total out
+  the way they do in reality.
+
+The generator now draws a fixed number of random values in the below-deductible step, so future
+amount changes don't reshuffle other columns.
+
+**Multi-decade world** (`scripts/simulate_decades.py`, `data/sim_decades/`): 2002–2024. It uses
+real GES (2002–15) and CRSS (2016–24) crashes, priced with BLS CPI (repairs relative to car
+prices). Rideshare use starts in 2012, endorsements in 2015, ADAS spreads from 2012. Recent years
+are weighted (2020s ×4 vs the 2000s). The total-loss share rises from 10% (2002) to 19% (2024),
+the real direction.
+
+## Independent appraisal (stage 2)
+Every claim gets an appraisal before payment: `appraised_amount` = true repair cost ×
+exp(N(−0.05, 0.27)) (appraisers come in slightly under the shop; the spread is the appraiser's
+error 0.20 and the honest shop-estimate error `shop_sigma` 0.18 combined, since honest claims are
+filed at true cost; without it the gap feature tripped the 0.9 canary), the vehicle value for a
+theft, and `appraiser_prior_damage` (noted on 50% of prior-damage frauds, 2% of legitimate claims).
+It uses its own random stream, so adding it changed no other column (a test checks this). Tagged
+`appraisal`: usable by the stage-2 fraud model only.
+
 ## Ground truth (the oracle, `simulator/oracle.py`)
 1. **Deny** if the policy can't pay: liability-only, excluded driver, mechanical breakdown,
    business use without endorsement, a comprehensive cause without comprehensive cover, or a

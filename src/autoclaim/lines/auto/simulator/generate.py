@@ -200,7 +200,14 @@ def _true_damage(df: pd.DataFrame, world: World, rng: np.random.Generator) -> np
     sigma = np.where(use_extent, by_extent[:, 1], by_cause[:, 1])
     frac = median * np.exp(sigma * rng.standard_normal(n))
     frac = np.where(df["towed"].to_numpy() == 1.0, frac * world.towed_damage_multiplier, frac)
-    frac = np.where(cause == "theft", 1.0, np.minimum(frac, 1.2))
+    # Thefts: an unrecovered car is a total loss; a recovered one needs a repair. Draws are taken
+    # for every row (fixed count), so tuning amounts never shifts later random draws.
+    tr = world.theft_recovery
+    recovered = rng.random(n) < tr.rate
+    rec_frac = tr.damage_fraction[0] * np.exp(tr.damage_fraction[1] * rng.standard_normal(n))
+    theft = cause == "theft"
+    frac = np.where(theft & ~recovered, 1.0,
+                    np.where(theft, np.minimum(rec_frac, 1.0), np.minimum(frac, 1.2)))  # fmt: skip
     damage = frac * df["vehicle_acv"].to_numpy()
     glass_adas = (cause == "glass") & df["adas"].to_numpy()
     damage = damage + np.where(glass_adas, world.adas_glass_recalibration_usd, 0.0)
@@ -221,7 +228,8 @@ def _rarely_filed_below_deductible(
     below = (damage < np.nan_to_num(deductible, nan=-1.0)) & (
         rng.random(len(df)) < UNFILED_BELOW_DEDUCTIBLE
     )
-    damage[below] = np.round(deductible[below] * rng.uniform(1.1, 3.0, below.sum()), 2)
+    redraw = rng.uniform(1.1, 3.0, len(df))  # fixed count: amounts never shift later draws
+    damage[below] = np.round(deductible[below] * redraw[below], 2)
     return damage
 
 
@@ -400,6 +408,26 @@ def _plant_traps(df: pd.DataFrame, world: World, rng: np.random.Generator) -> pd
     return out
 
 
+def _appraise(df: pd.DataFrame, world: World, seed: int) -> pd.DataFrame:
+    """Independent appraisal after first notice, from its own random stream (no other column
+    changes when this is added or tuned). Fraud is never revealed directly: an appraisal only
+    measures the damage, and sometimes notices old unrelated damage."""
+    aw = world.appraisal
+    rng = np.random.default_rng([seed, aw.seed_offset])
+    n = len(df)
+    spread = float(np.hypot(aw.sigma, aw.shop_sigma))  # one draw: other appraisal draws stay put
+    noise = np.exp(aw.log_bias + spread * rng.standard_normal(n))
+    true = df["gt_true_damage"].to_numpy()
+    theft = df["cause"].to_numpy() == "theft"
+    appraised = np.where(theft, df["vehicle_acv"].to_numpy(), true * noise)
+    prior = (df["gt_fraud_type"] == "prior_damage").to_numpy()
+    flag_p = np.where(prior, aw.prior_damage_detect, aw.prior_damage_false_flag)
+    return df.assign(
+        appraised_amount=np.round(np.maximum(appraised, 50.0), 2),
+        appraiser_prior_damage=rng.random(n) < flag_p,
+    )
+
+
 def build_claims(
     world: World,
     incidents: pd.DataFrame,
@@ -447,6 +475,7 @@ def build_claims(
     df["policy_start_date"] = df["loss_date"] - pd.to_timedelta(df["days_since_start"], unit="D")
     df["report_date"] = df["loss_date"] + pd.to_timedelta(df["notice_days"], unit="D")
     df = df.drop(columns=["days_since_start"])
+    df = _appraise(df, world, world.seed if seed is None else seed)
     df.insert(0, "claim_id", [f"CLM-{i:06d}" for i in range(n)])
     df.insert(1, "policy_id", [f"POL-{i:06d}" for i in rng.permutation(n)])
     return df

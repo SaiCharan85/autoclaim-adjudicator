@@ -18,6 +18,14 @@ dependencies = [
     "lightgbm>=4.3",
     "xgboost>=2.0",
     "interpret-core>=0.6",
+    "httpx>=0.27",
+    "faiss-cpu>=1.8",
+    "fastembed>=0.4",
+    "networkx>=3.3",
+    "rank-bm25>=0.2.2",
+    "langgraph>=0.6",
+    "langgraph-checkpoint-sqlite>=2.0",
+    "pyreadstat>=1.2",
 ]
 
 [dependency-groups]
@@ -66,7 +74,8 @@ strict = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["kaggle.*", "sklearn.*", "catboost.*", "joblib.*", "lightgbm.*", "xgboost.*", "interpret.*"]
+module = ["kaggle.*", "sklearn.*", "catboost.*", "joblib.*", "lightgbm.*", "xgboost.*", "interpret.*",
+          "faiss.*", "fastembed.*", "networkx.*", "rank_bm25.*", "pyreadstat.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

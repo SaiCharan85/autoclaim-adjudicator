@@ -226,3 +226,59 @@ def test_identical_across_processes() -> None:
         )
         digests.add(out.stdout.strip())
     assert len(digests) == 1, "dataset depends on Python's hash seed"
+
+
+# ---------------------------------------------------------------- appraisal (stage 2)
+
+
+def test_appraisal_measures_damage_not_fraud(claims: pd.DataFrame, world: World) -> None:
+    theft = claims["cause"] == "theft"
+    assert (claims.loc[theft, "appraised_amount"] == claims.loc[theft, "vehicle_acv"]).all()
+    ratio = np.log(claims.loc[~theft, "appraised_amount"] / claims.loc[~theft, "gt_true_damage"])
+    big = ratio[claims.loc[~theft, "gt_true_damage"] > 500]  # the $50 floor distorts tiny ones
+    assert abs(big.mean() - world.appraisal.log_bias) < 0.03
+    assert abs(big.std() - np.hypot(world.appraisal.sigma, world.appraisal.shop_sigma)) < 0.03
+    inflated = claims["gt_fraud_type"] == "inflated_damage"
+    gap = np.log(claims["claimed_amount"] / claims["appraised_amount"])
+    assert gap[inflated].median() > gap[~claims["gt_is_fraud"]].median() + 0.3
+
+
+def test_appraiser_prior_damage_flag_rates(claims: pd.DataFrame) -> None:
+    prior = claims["gt_fraud_type"] == "prior_damage"
+    assert claims.loc[prior, "appraiser_prior_damage"].mean() > 0.3
+    assert claims.loc[~claims["gt_is_fraud"], "appraiser_prior_damage"].mean() < 0.05
+
+
+def test_appraisal_changes_no_other_column(claims: pd.DataFrame, world: World) -> None:
+    base = claims.drop(columns=["appraised_amount", "appraiser_prior_damage"])
+    again = gen._appraise(base, world, world.seed)
+    pd.testing.assert_frame_equal(again[base.columns], base)
+    pd.testing.assert_series_equal(again["appraised_amount"], claims["appraised_amount"])
+
+
+def test_shop_sigma_widens_gap_without_moving_other_draws(
+    claims: pd.DataFrame, world: World
+) -> None:
+    base = claims.drop(columns=["appraised_amount", "appraiser_prior_damage"])
+    aw = world.appraisal
+    tidy = world.model_copy(update={"appraisal": aw.model_copy(update={"shop_sigma": 0.0})})
+    wide = world.model_copy(update={"appraisal": aw.model_copy(update={"shop_sigma": 0.4})})
+    a, b = gen._appraise(base, tidy, world.seed), gen._appraise(base, wide, world.seed)
+    pd.testing.assert_series_equal(a["appraiser_prior_damage"], b["appraiser_prior_damage"])
+    honest = ~claims["gt_is_fraud"] & (claims["cause"] != "theft")
+    gap = lambda d: np.log(claims["claimed_amount"] / d["appraised_amount"])[honest]  # noqa: E731
+    assert gap(b).std() > gap(a).std() + 0.1
+
+
+def test_shop_sigma_must_be_non_negative(world: World) -> None:
+    with pytest.raises(ValueError):
+        type(world.appraisal).model_validate({**world.appraisal.model_dump(), "shop_sigma": -0.1})
+
+
+def test_about_half_of_thefts_are_recovered_and_repaired(
+    claims: pd.DataFrame, world: World
+) -> None:
+    theft = claims[claims["cause"] == "theft"]
+    total = theft["gt_true_damage"] >= theft["vehicle_acv"] - 0.01
+    assert abs((~total).mean() - world.theft_recovery.rate) < 0.12  # recovered -> partial repair
+    assert (theft.loc[~total, "gt_true_damage"] < theft.loc[~total, "vehicle_acv"]).all()

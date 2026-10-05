@@ -94,3 +94,25 @@ def test_unknown_dataset() -> None:
             "nope",
             CFG.model_copy(update={"datasets": {**CFG.datasets, "nope": CFG.datasets["sim_us"]}}),
         )
+
+
+def test_sim_appraisal_stage(sim_raw: pd.DataFrame) -> None:
+    spec = ds.get_spec("sim_us_appraisal", CFG)
+    frame = spec.prepare(sim_raw)
+    expected = np.log(sim_raw["claimed_amount"] / sim_raw["appraised_amount"])
+    assert np.allclose(frame["log_claim_to_appraisal"], expected)
+    features = feature_list(frame)
+    spec.check_features(features)  # appraisal features allowed at stage 2 ...
+    with pytest.raises(LeakageError):
+        ds.get_spec("sim_us", CFG).check_features(features)  # ... never at first notice
+    partial = ds.sim_appraisal_features(sim_raw.drop(columns=["appraised_amount"]))
+    assert partial["log_claim_to_appraisal"].isna().all()
+
+
+def test_decades_specs_registered() -> None:
+    one = ds.get_spec("sim_decades", CFG)
+    two = ds.get_spec("sim_decades_appraisal", CFG)
+    one.check_features(["cause", "claimed_amount"])
+    two.check_features(["cause", "log_claim_to_appraisal"])
+    with pytest.raises(LeakageError):
+        one.check_features(["log_claim_to_appraisal"])
