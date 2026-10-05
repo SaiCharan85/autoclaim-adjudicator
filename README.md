@@ -52,9 +52,23 @@ flowchart LR
 | **router** | Config-driven thresholds decide between auto-decide and human review (code) |
 | **human_review** | LangGraph interrupt/resume; answered by a Streamlit console or an oracle adjuster in evals |
 
+## Demo
+
+```bash
+uv sync
+uv run python scripts/run_claims.py --set dev --n 3       # a few claims through the harness (~4.5 free-tier LLM calls each)
+uv run streamlit run src/autoclaim/ui/console.py          # adjuster console: review what was escalated
+```
+
+The console lists claims the harness could not decide alone, with why each was escalated, the
+harness's proposal (outcome, payout, cited clauses, explanation), the deterministic numbers, fraud
+signals and any critic/judge issues. Submitting a decision resumes the paused claim (finalized
+exactly once) and stores it in feedback memory. The console itself makes no LLM calls.
+
 ## Status
 
-Work in progress. Setup, results, and demo instructions will be added as the project lands.
+Work in progress: the harness, judge (on [JudgeKit](https://github.com/SaiCharan85/JudgeKit)),
+feedback memory and console work; evaluation runs and fine-tuning are under way.
 
 ## Data
 

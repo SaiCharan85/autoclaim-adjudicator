@@ -1,6 +1,7 @@
 """Wire the auto harness from config: one call gives a runnable, checkpointed graph."""
 
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from autoclaim.core.budget import BudgetConfig
 from autoclaim.core.finalize import FinalizationLedger
 from autoclaim.core.graph import Harness, HarnessConfig
 from autoclaim.core.judge import build_judge, load_rubric
-from autoclaim.core.lob import MemoryStore
+from autoclaim.core.lob import LineOfBusiness, MemoryStore
 from autoclaim.core.memory import FeedbackMemory, HNSWMemoryIndex, make_few_shot
 from autoclaim.core.router import RouterConfig
 from autoclaim.lines.auto.fraud_tools import FraudToolkit
@@ -86,9 +87,13 @@ def build(
     few_shot: FewShot | None = None,
     checkpoint_path: Path | None = None,
     read_only_memory: bool = False,
+    state_dir: Path | None = None,
+    wrap_line: Callable[[AutoLine], LineOfBusiness] | None = None,
 ) -> AutoHarness:
     """`read_only_memory`: evaluation runs read the memory built from earlier periods but
-    never write to it."""
+    never write to it. `state_dir`: where the finalization ledger, checkpoints and audit log
+    live (each evaluation arm gets its own, so arms never see each other's decisions).
+    `wrap_line`: an ablation wrapper around the line (evaluation only)."""
     cfg = cfg or load_carrier_config()
     client = client or LLMClient.from_config(cfg.models)
     hcfg = harness_config(cfg)
@@ -111,9 +116,13 @@ def build(
     k = cfg.memory.few_shot_k if cfg.memory is not None else 0
     if few_shot is None and isinstance(memory, FeedbackMemory) and k > 0:
         line.few_shot = make_few_shot(memory, k)
-    ledger = FinalizationLedger(CACHE / "harness" / "finalized.sqlite3")
-    harness = Harness(line, hcfg, AuditSink(data_dir() / "audit"), ledger, memory)
-    path = checkpoint_path or CACHE / "harness" / "checkpoints.sqlite3"
+    state = state_dir or CACHE / "harness"
+    state.mkdir(parents=True, exist_ok=True)
+    ledger = FinalizationLedger(state / "finalized.sqlite3")
+    audit = AuditSink(state / "audit" if state_dir else data_dir() / "audit")
+    lob = wrap_line(line) if wrap_line else line
+    harness = Harness(lob, hcfg, audit, ledger, memory)
+    path = checkpoint_path or state / "checkpoints.sqlite3"
     path.parent.mkdir(parents=True, exist_ok=True)
     saver = SqliteSaver(sqlite3.connect(str(path), check_same_thread=False))
     return AutoHarness(harness, harness.build(saver), line, client)

@@ -10,7 +10,7 @@ _spec.loader.exec_module(pk)
 
 def test_kernel_runs_on_gpu_privately_with_the_dataset_attached() -> None:
     meta = pk.kernel_metadata("alice")
-    assert meta["id"] == "alice/autoclaim-finetune"
+    assert meta["id"] == "alice/autoclaim-finetune-run"  # not the dataset slug
     assert (meta["enable_gpu"], meta["is_private"], meta["enable_internet"]) == ("true",) * 3
     assert meta["kernel_type"] == "script" and meta["language"] == "python"
     assert meta["dataset_sources"] == ["alice/autoclaim-finetune"]

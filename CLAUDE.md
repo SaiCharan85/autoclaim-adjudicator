@@ -137,11 +137,11 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 | Retrieval benchmark | `uv run python scripts/retrieval_benchmark.py` → `docs/retrieval_benchmark.md` |
 | Build claim narratives | `uv run python scripts/build_narratives.py --set eval\|dev --n 300 [--dry-run]` → `data/sim/packages/` |
 | Run claims (smoke) | `uv run python scripts/run_claims.py --set dev --n 3 [--dry-run]` |
-| Run demo | _TBD (Step 9)_ |
+| Run demo | `uv run python scripts/run_claims.py --set dev --n 3` then `uv run streamlit run src/autoclaim/ui/console.py` |
 | Judge planted-error eval | `uv run python scripts/judge_eval.py --n 10 [--dry-run] [--final]` → `docs/judge_eval_<set>_n<N>.md` (checkpointed, resumable) |
 | Review queue | `uv run python scripts/review_queue.py --list` / `--adjuster oracle [--error-rate 0.05]` (no LLM calls) |
 | Fine-tuning data / Kaggle | `uv run python scripts/build_finetune_data.py` then `scripts/package_kaggle.py --user <name>` (docs/finetune.md) |
-| Run eval | _TBD (Step 8)_ |
+| Run eval | `uv run python scripts/run_eval.py --set dev --n 50 --arms full no_judge no_critic few_shot [--dry-run]`; memory first: `--build-memory 40`; locked test: `--set eval --final` → `eval/report_<set>.md` |
 
 ## 9. Step plan
 - ☑ Step 0 — Foundations (CLAUDE.md, pyproject, skeleton, CI, DATA.md, README stub)
@@ -155,10 +155,10 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - ☑ Step 6 — Judge on JudgeKit (../JudgeKit, editable; CI checks out tag v0.1.0): adapter in `core/judge.py`, rubric severity tiers, insurance planted errors (`lines/auto/judge_eval.py`), `scripts/judge_eval.py` (live smoke n=1 done; pilot n=10 = 54 calls pending OK). Local judge: add an `ollama:` model to the judge chain once one exists (Step 7.5 exports the fine-tuned small judge); Ollama is not installed/running yet
 - ☑ Step 7 — Memory & oracle: `core/memory.py` (episodes, HNSW, cutoff 2024-07-01, read-only for evals, few-shot off until A/B), `simulator/adjuster.py` (noisy oracle), `core/review.py` + `scripts/review_queue.py` (pause/resume e2e, free)
 - ◐ Step 7.5 — Fine-tuning (docs/finetune.md): data built (no LLM), Qwen3-4B-Instruct-2507 QLoRA script + Kaggle kernel ready; GPU run pending user push (~2 h). Distillation deferred; deps pinned in kaggle/requirements-finetune.txt (user decisions 2026-10-05)
-- ☐ Step 8 — Evaluation (`run_eval.py`, metrics, ablations incl. base vs. fine-tuned, learning loop, `eval/report.md`)
+- ◐ Step 8 — Evaluation: code done (`lines/auto/harness_eval.py` pre-registered metrics, ablations no_judge/no_critic, few_shot learning loop, paired bootstrap; `scripts/run_eval.py` per-arm state + resume); live runs pending OK (`run_eval.py`, metrics, ablations incl. base vs. fine-tuned, learning loop, `eval/report.md`)
   + fraud A/B: ML-only vs LLM-only vs hybrid on ~200 test claims (cached; user decision 2026-10-04)
 - ☐ Step 8.5 — Flood line module on real FEMA NFIP claims (plug-in demo; after the auto harness works)
-- ☐ Step 9 — Adjuster console (Streamlit, resume interrupted claims, demo script)
+- ☑ Step 9 — Adjuster console: `ui/console.py` (Streamlit 1.65) over tested `ui/review_view.py`; queue, case view, decision form -> `core.review.resume`, audit trail; AppTest smoke passes
 - ☐ Step 10 — Polish (final README, architecture doc, playbook, CI badge, limitations)
 
 Decisions 2026-10-04: two-stage fraud triage (first notice + independent appraisal) for >= 80% TRUE-fraud

@@ -28,8 +28,8 @@ uv run python scripts/build_finetune_data.py            # free, ~1 min, CPU
 uv run python scripts/package_kaggle.py --user <kaggle-username>
 kaggle datasets create -p .cache/kaggle/dataset         # private
 kaggle kernels push -p .cache/kaggle/kernel             # GPU batch job, ~2 h (docs/compute_budget.md)
-kaggle kernels status <kaggle-username>/autoclaim-finetune
-kaggle kernels output <kaggle-username>/autoclaim-finetune -p models/finetune
+kaggle kernels status <kaggle-username>/autoclaim-finetune-run
+kaggle kernels output <kaggle-username>/autoclaim-finetune-run -p models/finetune
 ```
 
 The kernel scores the base model, trains, scores the fine-tuned model on the same held-out

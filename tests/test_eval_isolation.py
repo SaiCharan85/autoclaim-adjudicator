@@ -5,6 +5,7 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[1] / "src"
 EVAL_ONLY = {"autoclaim.lines.auto.simulator.oracle", "autoclaim.lines.auto.judge_eval",
+             "autoclaim.lines.auto.harness_eval",
              "autoclaim.lines.auto.simulator.adjuster"}  # fmt: skip
 EVAL_ONLY_PREFIXES = ("autoclaim.finetune",)  # training data builders read truth too
 # Data-building code (the simulator) may use the oracle to write ground-truth columns.

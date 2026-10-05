@@ -8,8 +8,8 @@ Usage:
 then (your account; runs as a background batch job, ~2 GPU hours on a T4):
   kaggle datasets create -p .cache/kaggle/dataset        (first time; later: datasets version)
   kaggle kernels push -p .cache/kaggle/kernel
-  kaggle kernels status <user>/autoclaim-finetune
-  kaggle kernels output <user>/autoclaim-finetune -p models/finetune
+  kaggle kernels status <user>/autoclaim-finetune-run
+  kaggle kernels output <user>/autoclaim-finetune-run -p models/finetune
 """
 
 import argparse
@@ -20,6 +20,7 @@ import sys
 from autoclaim.paths import REPO_ROOT, data_dir
 
 SLUG = "autoclaim-finetune"
+KERNEL_SLUG = f"{SLUG}-run"  # a kernel may not reuse the dataset's slug (Kaggle answers 409)
 FILES = ("intake_train.jsonl", "intake_val.jsonl", "judge_train.jsonl", "judge_val.jsonl")
 
 
@@ -30,8 +31,8 @@ def dataset_metadata(user: str) -> dict[str, object]:
 
 def kernel_metadata(user: str) -> dict[str, object]:
     return {
-        "id": f"{user}/{SLUG}",
-        "title": SLUG,
+        "id": f"{user}/{KERNEL_SLUG}",
+        "title": KERNEL_SLUG,
         "code_file": "run_on_kaggle.py",
         "language": "python",
         "kernel_type": "script",
@@ -71,8 +72,8 @@ def main() -> int:
     print(f"dataset: {ds} ({size:.1f} MB, private)\nkernel:  {kn} (GPU, internet on)")
     print("push with:\n"
           f"  kaggle datasets create -p {ds}\n  kaggle kernels push -p {kn}\n"
-          f"  kaggle kernels status {args.user}/{SLUG}\n"
-          f"  kaggle kernels output {args.user}/{SLUG} -p models/finetune")  # fmt: skip
+          f"  kaggle kernels status {args.user}/{KERNEL_SLUG}\n"
+          f"  kaggle kernels output {args.user}/{KERNEL_SLUG} -p models/finetune")  # fmt: skip
     return 0
 
 
