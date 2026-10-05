@@ -6,7 +6,7 @@ the critic (code) and the judge (another model family) verify. Tool outputs alwa
 
 import json
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -17,6 +17,7 @@ from autoclaim.config import JurisdictionProfile
 from autoclaim.core.decision import CheckResult, Decision, Issue
 from autoclaim.core.judge import Judge
 from autoclaim.core.lob import NodeResult
+from autoclaim.core.memory import MemoryText
 from autoclaim.core.state import ClaimState
 from autoclaim.lines.auto.claim import ClaimPackage
 from autoclaim.lines.auto.facts import BUSINESS_USES, ClaimFacts, DerivedFacts, derive
@@ -154,6 +155,32 @@ def _compact(obj: Any) -> str:
     return json.dumps(obj, separators=(",", ":"), default=str)
 
 
+def clauses_text(by_id: Mapping[str, Any], ids: Sequence[str]) -> str:
+    """Full text of the cited clauses that exist, once each, in citation order."""
+    out = []
+    for cid in dict.fromkeys(ids):
+        c = by_id.get(cid)
+        if c is not None:
+            out.append(f"[{c.id}] {c.title}: {c.text}")
+    return "\n".join(out)
+
+
+def render_judge_case(
+    facts: ClaimFacts,
+    derived: DerivedFacts,
+    clauses_text: str,
+    decision: dict[str, Any],
+    explanation: str,
+) -> str:
+    """What the judge sees: evidence first (facts, numbers, cited clause text), then the
+    decision and its explanation. Shared by the live judge node and the judge evals."""
+    return (f"facts: {_compact(facts.model_dump(mode='json'))}\n"
+            f"deterministic: {_compact(derived.model_dump(mode='json'))}\n"
+            f"cited clauses:\n{clauses_text or '(none)'}\n"
+            f"decision: {_compact({k: decision[k] for k in ('outcome', 'payout', 'reasons')})}\n"
+            f"explanation: {explanation}")  # fmt: skip
+
+
 # ---------------------------------------------------------------- the line
 
 
@@ -190,12 +217,7 @@ class AutoLine:
         return ClaimFacts.model_validate(f["extracted"]), DerivedFacts.model_validate(f["derived"])
 
     def _clauses_text(self, ids: Sequence[str]) -> str:
-        out = []
-        for cid in dict.fromkeys(ids):
-            c = self._by_id.get(cid)
-            if c is not None:
-                out.append(f"[{c.id}] {c.title}: {c.text}")
-        return "\n".join(out)
+        return clauses_text(self._by_id, ids)
 
     @staticmethod
     def _declarations(pkg: ClaimPackage) -> dict[str, Any]:
@@ -418,11 +440,9 @@ class AutoLine:
     def judge_case(self, state: ClaimState) -> str:
         d = state["decision"]
         facts, derived = self._facts(state)
-        return (f"facts: {_compact(facts.model_dump(mode='json'))}\n"
-                f"deterministic: {_compact(derived.model_dump(mode='json'))}\n"
-                f"cited clauses:\n{self._clauses_text(d['cited_clauses']) or '(none)'}\n"
-                f"decision: {_compact({k: d[k] for k in ('outcome', 'payout', 'reasons')})}\n"
-                f"explanation: {d['explanation']}")  # fmt: skip
+        return render_judge_case(
+            facts, derived, self._clauses_text(d["cited_clauses"]), d, d["explanation"]
+        )
 
     def judge(self, state: ClaimState) -> NodeResult:
         family = state["decision"].get("model_family") or ""
@@ -432,6 +452,23 @@ class AutoLine:
             calls,
             {"passed": res.passed, "issues": [i.code for i in res.issues]},
         )
+
+    # -------------------------------------------------------- feedback memory
+
+    def memory_text(self, state: ClaimState) -> MemoryText:
+        """How a case is described in feedback memory: the coverage-deciding facts (what makes
+        two claims similar), dated by the loss date for the memory's leakage cutoff."""
+        pkg = self.package(state)
+        if "facts" not in state:  # failed before intake: only the story is known
+            return MemoryText(f"unprocessed claim: {pkg.narrative[:300]}", pkg.report_date)
+        facts, x = self._facts(state)
+        on_policy = "on" if x.part_on_policy else "NOT on"
+        notice = f"notice {x.notice_days} days{' (late)' if x.late_notice else ''}"
+        text = (f"{facts.cause} loss; {x.coverage_part} coverage {on_policy} policy; "
+                f"driver {x.driver_role}; use {facts.use_at_loss}; {notice}; "
+                f"estimate {pkg.estimate_amount:.0f}, approval would pay {x.payout:.0f}; "
+                f"{facts.summary}")  # fmt: skip
+        return MemoryText(text, facts.loss_date or pkg.report_date)
 
     # -------------------------------------------------------- routing inputs
 

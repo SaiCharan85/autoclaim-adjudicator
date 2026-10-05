@@ -16,7 +16,7 @@ from autoclaim.core.audit import AuditSink
 from autoclaim.core.budget import BudgetConfig
 from autoclaim.core.finalize import FinalizationLedger
 from autoclaim.core.graph import Harness, HarnessConfig
-from autoclaim.core.judge import LLMJudge, load_rubric
+from autoclaim.core.judge import build_judge, load_rubric
 from autoclaim.core.router import RouterConfig
 from autoclaim.lines.auto.build import RUBRIC_PATH
 from autoclaim.lines.auto.facts import derive
@@ -233,7 +233,7 @@ def _run(decision: dict, score: float = 0.05, judge_yes: bool = True):
     ledger = UsageLedger(":memory:", cfg.catalog, 1.0, 0, sleep=lambda s: None)
     client = LLMClient(cfg, {"a": script, "b": script}, LLMCache(":memory:"), ledger)
     line = _line(client=client, toolkit=FakeToolkit(score),
-                 judge=LLMJudge(client, load_rubric(RUBRIC_PATH)))  # fmt: skip
+                 judge=build_judge(client, load_rubric(RUBRIC_PATH)))  # fmt: skip
     hcfg = HarnessConfig(max_retries=2,
                          router=RouterConfig(min_confidence=0.7, fraud_review_score=0.24,
                                              authority_limit_usd=15000),
@@ -267,3 +267,21 @@ def test_judge_failures_exhaust_retries_then_human() -> None:
     out, _ = _run(_decision(), judge_yes=False)
     assert out["retries"] == 2
     assert "checks_failed_after_retries" in out["__interrupt__"][0].value["route_reasons"]
+
+
+# ---------------------------------------------------------------- feedback memory text
+
+
+def test_memory_text_describes_coverage_deciding_facts() -> None:
+    state = _state()
+    desc = _line().memory_text(state)
+    assert desc.when == facts().loss_date
+    for part in ("animal loss", "comprehensive coverage on policy", "driver named_insured",
+                 "approval would pay 1650"):  # fmt: skip
+        assert part in desc.text, part
+
+
+def test_memory_text_before_intake_uses_the_story_and_report_date() -> None:
+    pkg = package()
+    desc = _line().memory_text({"claim_id": "X", "claim": pkg.model_dump(mode="json")})
+    assert desc.text.startswith("unprocessed claim: ") and desc.when == pkg.report_date

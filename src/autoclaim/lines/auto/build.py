@@ -12,8 +12,9 @@ from autoclaim.core.audit import AuditSink
 from autoclaim.core.budget import BudgetConfig
 from autoclaim.core.finalize import FinalizationLedger
 from autoclaim.core.graph import Harness, HarnessConfig
-from autoclaim.core.judge import LLMJudge, load_rubric
+from autoclaim.core.judge import build_judge, load_rubric
 from autoclaim.core.lob import MemoryStore
+from autoclaim.core.memory import FeedbackMemory, HNSWMemoryIndex, make_few_shot
 from autoclaim.core.router import RouterConfig
 from autoclaim.lines.auto.fraud_tools import FraudToolkit
 from autoclaim.lines.auto.line import AutoLine, FewShot
@@ -52,6 +53,24 @@ def build_retriever(cfg: CarrierConfig) -> HybridRetriever:
                            PolicyGraph(policy.clauses), r.rrf_k, r.candidates)  # fmt: skip
 
 
+def build_memory(
+    cfg: CarrierConfig, retriever: HybridRetriever, line: AutoLine, read_only: bool = False
+) -> FeedbackMemory:
+    """Feedback memory on the retriever's (already loaded) local embedder, HNSW-indexed."""
+    if cfg.memory is None or retriever.dense is None:
+        raise ValueError("feedback memory needs a memory config and the dense retriever's embedder")
+    embedder = retriever.dense[0]
+    hnsw = cfg.retrieval.hnsw
+    return FeedbackMemory(
+        embedder,
+        line.memory_text,
+        path=REPO_ROOT / cfg.memory.path,
+        index_factory=lambda dim: HNSWMemoryIndex(dim, hnsw),
+        cutoff=cfg.memory.cutoff,
+        read_only=read_only,
+    )
+
+
 @dataclass
 class AutoHarness:
     harness: Harness
@@ -66,7 +85,10 @@ def build(
     memory: MemoryStore | None = None,
     few_shot: FewShot | None = None,
     checkpoint_path: Path | None = None,
+    read_only_memory: bool = False,
 ) -> AutoHarness:
+    """`read_only_memory`: evaluation runs read the memory built from earlier periods but
+    never write to it."""
     cfg = cfg or load_carrier_config()
     client = client or LLMClient.from_config(cfg.models)
     hcfg = harness_config(cfg)
@@ -76,7 +98,7 @@ def build(
         policy=retriever.policy,
         retriever=retriever,
         toolkit=FraudToolkit.load(),
-        judge_impl=LLMJudge(client, load_rubric(RUBRIC_PATH)),
+        judge_impl=build_judge(client, load_rubric(RUBRIC_PATH)),
         jurisdiction=cfg.active_jurisdiction,
         fraud_review_score=hcfg.router.fraud_review_score,
         top_k=cfg.retrieval.top_k,
@@ -84,6 +106,11 @@ def build(
         max_expanded=cfg.retrieval.max_expanded,
         few_shot=few_shot,
     )
+    if memory is None and cfg.memory is not None and cfg.memory.enabled:
+        memory = build_memory(cfg, retriever, line, read_only=read_only_memory)
+    k = cfg.memory.few_shot_k if cfg.memory is not None else 0
+    if few_shot is None and isinstance(memory, FeedbackMemory) and k > 0:
+        line.few_shot = make_few_shot(memory, k)
     ledger = FinalizationLedger(CACHE / "harness" / "finalized.sqlite3")
     harness = Harness(line, hcfg, AuditSink(data_dir() / "audit"), ledger, memory)
     path = checkpoint_path or CACHE / "harness" / "checkpoints.sqlite3"

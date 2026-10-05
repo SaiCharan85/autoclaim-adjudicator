@@ -142,6 +142,15 @@ class ModelsConfig(BaseModel):
         return self
 
 
+class MemoryConfig(BaseModel):
+    """Feedback memory (core/memory.py). Few-shot stays off (k = 0) until measured to help."""
+
+    enabled: bool = True
+    few_shot_k: int = Field(default=0, ge=0)
+    cutoff: date  # never remember cases on or after this date (the evaluation period)
+    path: str = ".cache/memory/feedback.sqlite3"
+
+
 class CarrierConfig(BaseModel):
     model_config = ConfigDict(extra="allow")  # sections typed in later steps pass through
 
@@ -152,6 +161,7 @@ class CarrierConfig(BaseModel):
     jurisdiction: str
     jurisdictions: dict[str, JurisdictionProfile]
     models: ModelsConfig
+    memory: MemoryConfig | None = None
 
     @model_validator(mode="after")
     def _known_jurisdiction(self) -> "CarrierConfig":

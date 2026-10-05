@@ -46,7 +46,7 @@ class Harness:
         self.cfg = cfg
         self.audit = audit
         self.ledger = ledger
-        self.memory = memory or NoMemory()
+        self.memory = memory if memory is not None else NoMemory()  # an empty memory is falsy
 
     # ------------------------------------------------------------ node plumbing
 

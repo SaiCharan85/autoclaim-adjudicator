@@ -126,3 +126,11 @@ def test_models_chain_must_resolve(tmp_path: Path) -> None:
     path.write_text(yaml.safe_dump(raw), encoding="utf-8")
     with pytest.raises(ValueError, match="catalog"):
         load_carrier_config(path)
+
+
+def test_memory_cutoff_never_passes_the_locked_test_boundary() -> None:
+    cfg = load_carrier_config()
+    assert cfg.memory is not None and cfg.memory.enabled
+    test_start = cfg.fraud_model.datasets[cfg.fraud_model.production_dataset].test_start
+    assert test_start is not None and cfg.memory.cutoff <= test_start
+    assert cfg.memory.few_shot_k == 0  # few-shot stays off until an A/B shows it helps

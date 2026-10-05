@@ -4,16 +4,33 @@ on:
   push:
   pull_request:
 
+env:
+  # JudgeKit release this project is tested against (bump together with the tag).
+  JUDGEKIT_REF: v0.1.0
+
 jobs:
   lint-test:
     runs-on: ubuntu-latest
     # No API keys in CI: every LLM call in tests is mocked.
+    defaults:
+      run:
+        working-directory: autoclaim-adjudicator
     steps:
+      # Both repos side by side, as in local development: pyproject points at ../JudgeKit.
       - uses: actions/checkout@v4
+        with:
+          path: autoclaim-adjudicator
+
+      - uses: actions/checkout@v4
+        with:
+          repository: SaiCharan85/JudgeKit
+          ref: ${{ env.JUDGEKIT_REF }}
+          path: JudgeKit
 
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+          cache-dependency-glob: autoclaim-adjudicator/uv.lock
 
       - name: Install
         run: uv sync --locked
@@ -23,6 +40,9 @@ jobs:
 
       - name: Ruff format check
         run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy
 
       - name: Tests
         run: uv run pytest -m "not live_llm"

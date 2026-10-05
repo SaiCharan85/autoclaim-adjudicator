@@ -37,15 +37,28 @@ Example: a deer strike.
 6. **judge** (a different model family from the adjudicator, enforced per call)
    - Five yes/no rubric questions from `config/rubrics/adjudication_reasoning.yaml`: faithful to clauses, facts supported, numbers consistent, material facts addressed, outcome consistent.
    - It grades **reasoning only, never the decision**.
+   - Built on [JudgeKit](https://github.com/SaiCharan85/JudgeKit) behind a thin adapter (`core/judge.py`): each item has a severity tier (four critical, one major), and code, not the model, turns the answers into pass/fail.
+   - If no judge model can run (quota, outage), the claim goes to a human. A missing judgment is never sent back to the adjudicator as a retry.
+   - Judge quality is measured with planted errors: `scripts/judge_eval.py` (catch rate per error type, false alarms, bootstrap CIs).
 7. **router** (code)
    - Hard rules first: late notice (unless clearly denied), unknown cause, driver or loss date, unclear hit-and-run report timing, input flags.
    - Then thresholds: confidence < 0.7, approve with fraud score ≥ 0.24, payout > $15,000, the adjudicator escalated, checks failed, or a failsafe fired.
 8. **auto_decide** or **human_review**
    - Both finalize through an idempotent ledger: the first finalization wins, and a re-run returns the stored decision instead of paying twice.
    - `human_review` calls `interrupt()` with a ready case summary. The SQLite checkpointer keeps the claim paused until the console or the oracle adjuster resumes it with `Command(resume=...)`.
-   - The resumed decision goes to feedback memory (Step 7).
+   - The resumed decision goes to feedback memory (below).
 
 **Fail-safe:** any node exception, a provider outage after the fallback chain, or a per-claim budget trip (14 LLM calls / 60k tokens) sets `failsafe`. Later nodes skip, and the claim goes to a human. Nothing half-computed is ever finalized. Every node run is appended to `data/audit/<claim>.jsonl` with its node, timestamp, outputs, model, tokens, $0 cost, latency, and any LLM fallback errors.
+
+## Human review and feedback memory
+
+- **Review queue** (`core/review.py`): claims paused at human review are found in the checkpointer by claim id and resumed with the adjuster's decision. Finalization is idempotent: resuming twice is refused, and a re-run never decides twice.
+- **Simulated adjuster** (`lines/auto/simulator/adjuster.py`, evaluation only): answers with the ground-truth decision and makes seeded mistakes on a share of claims (default 5%), which are recorded so evaluations can measure their effect.
+- **Feedback memory** (`core/memory.py`): every human review stores one episode (a description of the case's coverage-deciding facts, the harness's proposal, the adjuster's decision and reason, and whether it was a correction). Local bge-large embeddings, FAISS HNSW, SQLite on disk. Vectors are stored, so reloading never re-embeds.
+  - Used only to **retrieve context**, never to reuse an answer.
+  - **Leakage:** cases on or after the memory cutoff (2024-07-01, the locked-test start) are never remembered, and evaluation runs open the memory read-only.
+  - Few-shot from memory is **off** (`memory.few_shot_k: 0`) until an A/B in Step 8 shows it helps.
+- First real loop (2026-10-05): CLM-040450 paused for late notice, the simulated adjuster approved $1,110.06 (the true notice was not late), the graph finalized it, and memory stored it as a correction. No LLM calls.
 
 ## First live smoke test (3 dev claims, 2026-10-04)
 | Claim | Harness | Ground truth (simulator oracle) | LLM calls / tokens |

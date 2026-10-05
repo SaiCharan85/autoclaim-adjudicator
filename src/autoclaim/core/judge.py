@@ -1,60 +1,27 @@
 """Judge: grades the REASONING behind a decision, never the decision itself.
 
-Labels evaluate outcomes; the judge evaluates explanations: is every statement supported by the
-claim facts and the cited clause text, is anything material ignored, does the explanation agree
-with the outcome? Yes/no questions from a YAML rubric (a yes always means "fine").
+The harness depends only on the small `Judge` interface below. JudgeKit (rubrics with severity
+tiers, the LLM judge runner, panels) sits behind it through a thin adapter, so the judging
+library can change without touching the graph.
 
-`Judge` is a protocol so the backend can be swapped: an API model from a different family than
-the adjudicator (default), or a local fine-tuned small judge (Step 7.5).
+Fail safe: if the judge cannot run (every model failed or is out of budget), `evaluate` raises
+`JudgeUnavailableError`; the graph turns that into a failsafe and the claim goes to a human. A
+missing judgment is never fed back to the adjudicator as if it were a "no" (that would spend
+retries on a judge outage).
 """
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Protocol, TypeVar
 
-import yaml
-from pydantic import BaseModel, Field
+import judgekit
+from pydantic import BaseModel
 
 from autoclaim.core.decision import CheckResult, Issue
 from autoclaim.llm.client import CallMeta, LLMClient
+from autoclaim.llm.types import LLMError
 
-
-class RubricItem(BaseModel):
-    id: str
-    question: str  # phrased so that "yes" = passes
-
-
-class Rubric(BaseModel):
-    name: str
-    version: str
-    instructions: str
-    items: list[RubricItem] = Field(min_length=1)
-
-
-def load_rubric(path: Path) -> Rubric:
-    return Rubric.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
-
-
-class Answer(BaseModel):
-    id: str
-    answer: Literal["yes", "no"]
-    note: str = Field(default="", max_length=300, description="why, if no")
-
-
-class Verdict(BaseModel):
-    answers: list[Answer]
-
-
-def to_check(rubric: Rubric, verdict: Verdict) -> CheckResult:
-    """Every rubric item must be answered yes; unanswered items count as failures."""
-    by_id = {a.id: a for a in verdict.answers}
-    issues = []
-    for item in rubric.items:
-        ans = by_id.get(item.id)
-        if ans is None:
-            issues.append(Issue(source="judge", code=item.id, detail="not answered by the judge"))
-        elif ans.answer == "no":
-            issues.append(Issue(source="judge", code=item.id, detail=ans.note or item.question))
-    return CheckResult(passed=not issues, issues=issues)
+T = TypeVar("T", bound=BaseModel)
 
 
 class Judge(Protocol):
@@ -63,22 +30,95 @@ class Judge(Protocol):
     ) -> tuple[CheckResult, list[CallMeta]]: ...
 
 
-def rubric_prompt(rubric: Rubric) -> str:
-    questions = "\n".join(f"- {i.id}: {i.question}" for i in rubric.items)
-    return f"{rubric.instructions}\n\nAnswer every question yes or no:\n{questions}"
+class JudgeUnavailableError(RuntimeError):
+    """No judgment could be made; route the claim to a human."""
 
 
-class LLMJudge:
-    def __init__(self, client: LLMClient, rubric: Rubric, role: str = "judge") -> None:
+def to_call_info(meta: CallMeta) -> judgekit.CallInfo:
+    return judgekit.CallInfo(
+        model=meta.model,
+        family=meta.family,
+        input_tokens=meta.prompt_tokens,
+        output_tokens=meta.completion_tokens,
+        latency_s=meta.latency_s,
+        attempts=1 + meta.validation_retries,
+        cached=meta.cached,
+    )
+
+
+class ClientLLM:
+    """JudgeKit's `StructuredLLM` over our client (cache, budgets, fallback, validation retry).
+    Keeps the `CallMeta` of each call so the graph can audit and budget it."""
+
+    def __init__(self, client: LLMClient, role: str = "judge") -> None:
         self.client = client
-        self.rubric = rubric
         self.role = role
-        self.instructions = rubric_prompt(rubric)
+        self.metas: list[CallMeta] = []
+
+    def complete(
+        self,
+        system: str,
+        user: str,
+        schema: type[T],
+        *,
+        avoid_families: frozenset[str] = frozenset(),
+    ) -> judgekit.StructuredResult[T]:
+        try:
+            res = self.client.structured(
+                self.role, system, user, schema, exclude_families=avoid_families
+            )
+        except LLMError as exc:
+            raise judgekit.LLMCallError(str(exc)) from exc
+        self.metas.append(res.meta)
+        return judgekit.StructuredResult(res.value, (to_call_info(res.meta),))
+
+
+def to_check(verdict: judgekit.Verdict) -> CheckResult:
+    """Pass/fail follows the rubric's severity tiers; every failed item (minor ones too) becomes
+    an issue, so a retry gets the full feedback."""
+    issues = [
+        Issue(source="judge", code=r.item_id, detail=r.note or f"{r.severity} check failed")
+        for r in verdict.failures
+    ]
+    return CheckResult(passed=verdict.passed, issues=issues)
+
+
+class JudgeKitJudge:
+    """Our `Judge` backed by any JudgeKit judge (one LLM judge or a panel)."""
+
+    def __init__(self, judge: judgekit.Judge, llms: Sequence[ClientLLM]) -> None:
+        self.judge = judge
+        self.llms = tuple(llms)
 
     def evaluate(
         self, case: str, exclude_families: frozenset[str]
     ) -> tuple[CheckResult, list[CallMeta]]:
-        res = self.client.structured(
-            self.role, self.instructions, case, Verdict, exclude_families=exclude_families
-        )
-        return to_check(self.rubric, res.value), [res.meta]
+        for llm in self.llms:
+            llm.metas.clear()
+        verdict = self.judge.evaluate(case, avoid_families=exclude_families)
+        if not verdict.available:
+            raise JudgeUnavailableError(verdict.error)
+        return to_check(verdict), [m for llm in self.llms for m in llm.metas]
+
+
+def load_rubric(path: Path) -> judgekit.Rubric:
+    return judgekit.load_rubric(path)
+
+
+def build_judge(client: LLMClient, rubric: judgekit.Rubric, role: str = "judge") -> JudgeKitJudge:
+    """The production judge: one LLM judge on the `role` model chain."""
+    llm = ClientLLM(client, role)
+    return JudgeKitJudge(judgekit.LLMJudge(llm, rubric, name=role), [llm])
+
+
+def build_panel(
+    client: LLMClient,
+    rubric: judgekit.Rubric,
+    roles: Sequence[str],
+    rule: judgekit.PanelRule = judgekit.PanelRule.MAJORITY,
+) -> JudgeKitJudge:
+    """A multi-judge panel, one member per role (each role has its own model chain); members
+    avoid each other's model families."""
+    llms = [ClientLLM(client, r) for r in roles]
+    members = [judgekit.LLMJudge(llm, rubric, name=llm.role) for llm in llms]
+    return JudgeKitJudge(judgekit.JudgePanel(members, rubric, rule=rule, name="panel"), llms)

@@ -24,6 +24,15 @@ harness:
   max_retries: 2          # critic/judge -> adjudicator retry loop
   seed: 42
 
+# Feedback memory: adjuster decisions on escalated claims, retrieved as context (never reused as
+# answers). Few-shot is off until an A/B shows it helps (Step 8). The cutoff keeps the locked
+# test period (fraud_model.datasets.sim_us.test_start) out of memory.
+memory:
+  enabled: true
+  few_shot_k: 0
+  cutoff: "2024-07-01"
+  path: .cache/memory/feedback.sqlite3
+
 # Fraud model. Production trains on the grounded-hybrid simulator (real CRSS crashes + simulated
 # policy/fraud); the real 1994–96 labels are the reality check. 3-way time splits: train /
 # validation (all decisions) / locked test (only with --final, logged in docs/test_set_log.md).

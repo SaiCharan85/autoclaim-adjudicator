@@ -26,6 +26,7 @@ dependencies = [
     "langgraph>=0.6",
     "langgraph-checkpoint-sqlite>=2.0",
     "pyreadstat>=1.2",
+    "judgekit",
 ]
 
 [dependency-groups]
@@ -82,3 +83,6 @@ ignore_missing_imports = true
 module = ["scripts.*", "eval.*", "tests.*"]
 strict = false
 disallow_untyped_defs = false
+
+[tool.uv.sources]
+judgekit = { path = "../JudgeKit", editable = true }

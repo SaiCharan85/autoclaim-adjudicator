@@ -1,0 +1,8 @@
+# Fine-tuning environment (Kaggle/Colab GPU only; never installed locally or in CI).
+# unsloth 2026.9.14 requires trl <= 0.24.0 (checked in its package metadata, 2026-10-05).
+# transformers / peft / bitsandbytes resolve inside unsloth's own ranges; the exact versions used
+# are recorded in run_log.json on every run.
+unsloth==2026.9.14
+unsloth_zoo==2026.9.9
+trl==0.24.0
+datasets
