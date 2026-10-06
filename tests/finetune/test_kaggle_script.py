@@ -126,3 +126,28 @@ def test_training_never_uses_test_period_data() -> None:
     # the script only reads <task>_train / <task>_val files: the builder refuses test-period rows
     src = SCRIPT.read_text(encoding="utf-8")
     assert "_train.jsonl" in src and "_val.jsonl" in src and "_test" not in src
+
+
+def test_find_gguf_looks_inside_unsloths_suffixed_folder(tmp_path: Path) -> None:
+    task = tmp_path / "judge"
+    (task / "gguf_gguf").mkdir(parents=True)
+    small, big = task / "gguf_gguf" / "tiny.gguf", task / "gguf_gguf" / "Qwen3.Q4_K_M.gguf"
+    small.write_bytes(b"x")
+    big.write_bytes(b"x" * 100)
+    assert ft.find_gguf(task) == big  # the real model, not a stray small file
+    assert ft.find_gguf(tmp_path / "missing") is None
+
+
+def test_modelfile_sits_next_to_the_gguf_with_its_real_name(tmp_path: Path) -> None:
+    gguf = tmp_path / "gguf_gguf" / "Qwen3-4B.Q4_K_M.gguf"
+    gguf.parent.mkdir()
+    gguf.write_bytes(b"x")
+    mf = ft.write_modelfile(gguf, "intake")
+    assert mf.parent == gguf.parent
+    text = mf.read_text()
+    assert text.startswith("FROM ./Qwen3-4B.Q4_K_M.gguf") and "num_predict 900" in text
+
+
+def test_cli_has_export_only_and_sampled_training_eval() -> None:
+    src = SCRIPT.read_text(encoding="utf-8")
+    assert "--export-only" in src and "--train-eval-n" in src

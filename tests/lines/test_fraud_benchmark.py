@@ -132,3 +132,17 @@ def test_benchmark_pool_and_rate(fraud_frame, legacy_spec) -> None:
 
 def test_instructions_cover_both_arms() -> None:
     assert set(fraud_llm.INSTRUCTIONS) == {"llm", "hybrid"}
+
+
+def test_scorable_needs_both_classes_among_claims_every_arm_scored() -> None:
+    import numpy as np
+
+    from autoclaim.lines.auto.fraud_benchmark import scorable
+
+    y = np.array([1, 0, 1, 0])
+    full = {"ml": np.array([0.9, 0.1, 0.8, 0.2]), "llm": np.array([0.7, 0.3, 0.6, 0.4])}
+    assert scorable(y, full)
+    quota_out = {"ml": full["ml"], "llm": np.full(4, np.nan)}  # LLM arm made no requests
+    assert not scorable(y, quota_out)
+    one_class = {"ml": full["ml"], "llm": np.array([0.7, np.nan, 0.6, np.nan])}
+    assert not scorable(y, one_class)

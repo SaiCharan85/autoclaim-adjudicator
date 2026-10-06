@@ -141,6 +141,7 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 | Judge planted-error eval | `uv run python scripts/judge_eval.py --n 10 [--dry-run] [--final]` → `docs/judge_eval_<set>_n<N>.md` (checkpointed, resumable) |
 | Review queue | `uv run python scripts/review_queue.py --list` / `--adjuster oracle [--error-rate 0.05]` (no LLM calls) |
 | Fine-tuning data / Kaggle | `uv run python scripts/build_finetune_data.py` then `scripts/package_kaggle.py --user <name>` (docs/finetune.md) |
+| Flood eval | `uv run python scripts/download_data.py fema_nfip` then `scripts/flood_eval.py --n 3000 [--final]` |
 | Run eval | `uv run python scripts/run_eval.py --set dev --n 50 --arms full no_judge no_critic few_shot [--dry-run]`; memory first: `--build-memory 40`; locked test: `--set eval --final` → `eval/report_<set>.md` |
 
 ## 9. Step plan
@@ -152,12 +153,12 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - ☑ Step 3 — Policy & retrieval (75-clause policy YAML, NetworkX graph, BM25 + bge-large HNSW + RRF, 1-hop, `docs/retrieval_benchmark.md`)
 - ☑ Step 4 — Synthetic claims (row-conditioned, style cards, traps enriched to 50%; 300 eval + 300 dev)
 - ☑ Step 5 — Harness core (state, nodes, edges, checkpointer, router, audit, fallback, budgets, idempotency; `docs/harness.md`)
-- ☑ Step 6 — Judge on JudgeKit (../JudgeKit, editable; CI checks out tag v0.1.0): adapter in `core/judge.py`, rubric severity tiers, insurance planted errors (`lines/auto/judge_eval.py`), `scripts/judge_eval.py` (live smoke n=1 done; pilot n=10 = 54 calls pending OK). Local judge: add an `ollama:` model to the judge chain once one exists (Step 7.5 exports the fine-tuned small judge); Ollama is not installed/running yet
+- ☑ Step 6 — Judge on JudgeKit (../JudgeKit, editable; CI checks out tag v0.1.0): adapter in `core/judge.py`, rubric severity tiers, insurance planted errors (`lines/auto/judge_eval.py`), `scripts/judge_eval.py` (live smoke n=1 done; pilot n=10 = 54 calls pending OK). Local judge: `ollama:autoclaim-judge` is the last fallback in the judge chain (Step 7.5)
 - ☑ Step 7 — Memory & oracle: `core/memory.py` (episodes, HNSW, cutoff 2024-07-01, read-only for evals, few-shot off until A/B), `simulator/adjuster.py` (noisy oracle), `core/review.py` + `scripts/review_queue.py` (pause/resume e2e, free)
-- ◐ Step 7.5 — Fine-tuning (docs/finetune.md): data built (no LLM), Qwen3-4B-Instruct-2507 QLoRA script + Kaggle kernel ready; GPU run pending user push (~2 h). Distillation deferred; deps pinned in kaggle/requirements-finetune.txt (user decisions 2026-10-05)
+- ☑ Step 7.5 — Fine-tuning (docs/finetune.md): Qwen3-4B-Instruct-2507 QLoRA on Kaggle T4 (~4.3 GPU h): judge catch 30%->95%, false alarms 18%->6%; intake fields 58%->95%; both GGUF exported and on Ollama 0.35 as the last fallback of the judge/intake chains (~17-34 s/call on CPU). Distillation deferred
 - ◐ Step 8 — Evaluation: code done (`lines/auto/harness_eval.py` pre-registered metrics, ablations no_judge/no_critic, few_shot learning loop, paired bootstrap; `scripts/run_eval.py` per-arm state + resume); live runs pending OK (`run_eval.py`, metrics, ablations incl. base vs. fine-tuned, learning loop, `eval/report.md`)
   + fraud A/B: ML-only vs LLM-only vs hybrid on ~200 test claims (cached; user decision 2026-10-04)
-- ☐ Step 8.5 — Flood line module on real FEMA NFIP claims (plug-in demo; after the auto harness works)
+- ☑ Step 8.5 — Flood line on real FEMA NFIP claims (docs/flood.md): `lines/flood/` on the unchanged core; locked test agreement 98.6%, wrongly denied/paid 0.3%/0.3%, auto 41.4% ($50k authority)
 - ☑ Step 9 — Adjuster console: `ui/console.py` (Streamlit 1.65) over tested `ui/review_view.py`; queue, case view, decision form -> `core.review.resume`, audit trail; AppTest smoke passes
 - ☐ Step 10 — Polish (final README, architecture doc, playbook, CI badge, limitations)
 

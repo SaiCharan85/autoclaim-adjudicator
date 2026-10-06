@@ -18,6 +18,7 @@ into the git-ignored `data/` folder. Ask before adding or changing any source.
 | 9 | **BLS CPI** series `CUUR0000SETD` (motor vehicle maintenance & repair), `SETA01` (new vehicles), `SETA02` (used cars & trucks) | **real** | Era-correct amounts: repair costs and vehicle values per year | **Public domain**; citation requested ([BLS](https://www.bls.gov/opub/copyright-information.htm)) | BLS public API v1 (no key) or `download.bls.gov/pub/time.series/cu/` |
 | 10 | **Cited single figures** (never copied tables/text): NAIC Auto Insurance Database Report; Insurance Information Institute auto facts (ISO/Verisk); CCC Crash Course; NICB press releases; state fraud-bureau annual reports (NY DFS, NJ OIFP, FL DFS, CA CDI, PA IFPA) | **real aggregates** | Calibrating claim frequency/severity, total-loss share and fraud mix by year | Copyright of each publisher; we record individual facts with source + page in `config/calibration_sources.yaml` | Added 2026-10-04 (user approved, "cite single figures only") |
 | 11 | **US DOJ press releases** on auto-insurance fraud ([justice.gov/news](https://www.justice.gov/news)) | **real cases (text)** | Real fraud-scheme patterns for red-flag rules and narratives | Public domain unless marked ([DOJ](https://www.justice.gov/legalpolicies)) | Paraphrased only |
+| 12 | **FEMA NFIP Redacted Claims** (OpenFEMA `FimaNfipClaims` v2), losses 2022-2025, 197,023 claims, coverage-relevant fields only (state is the only location kept) | **real** | Flood line plug-in (Step 8.5): deterministic flood payouts vs what was actually paid (`docs/flood_eval.md`); flood locked test = losses on or after 2024-07-01 | OpenFEMA terms (U.S. government data): cite FEMA with the required disclaimer; no re-identification; not to be used for determinations about anyone's rights or benefits ([terms](https://www.fema.gov/about/openfema/terms-conditions)) | `uv run python scripts/download_data.py fema_nfip` (free API, no key, ~20 paged requests) |
 
 ## Checked and avoided (2026-10-04)
 IIHS-HLDI bulk/API data (terms forbid derivatives), NICB member/NICTA/ForeCAST data, and anything
@@ -44,3 +45,8 @@ checked). Recent research uses private insurer data.
 - Downloaded data stays local. Derived artifacts that could reconstruct it (row dumps, trained
   weights) are also git-ignored.
 - Simulated fields and labels are fictional and must never be presented as real.
+
+
+## FEMA disclaimer (required by the OpenFEMA terms)
+
+This product uses the Federal Emergency Management Agency's OpenFEMA API, but is not endorsed by FEMA. The Federal Government or FEMA cannot vouch for the data or analyses derived from these data after the data have been retrieved from the Agency's website(s). Source: https://www.fema.gov/api/open/v2/FimaNfipClaims, accessed 2026-10-05. The flood line only replays historical, already-closed claims to test coverage logic; it makes no determination about any person.

@@ -1,0 +1,109 @@
+# Demo Mutual Insurance - fictional carrier. Residential flood coverage (building + contents), used
+# to show that a second line of business plugs into the shared harness. Every clause is written in
+# our own plain-English words for this project; it is NOT a copy or paraphrase of the federal
+# Standard Flood Insurance Policy or any insurer's form. Jurisdiction: US.
+policy:
+  id: demo_residential_flood
+  name: Demo Mutual Residential Flood Policy
+  version: "1.0"
+  jurisdiction: US
+clauses:
+  - id: FLD-BUILDING
+    section: insuring_agreement
+    title: Flood damage to the insured building is covered
+    text: >-
+      We pay for direct physical damage to the insured building caused by a flood, up to the
+      building limit shown on the declarations, after the building deductible.
+    edges:
+      - {type: uses_term, target: FLD-DEF-FLOOD}
+      - {type: subject_to, target: FLD-DEDUCTIBLE}
+      - {type: subject_to, target: FLD-LIMITS}
+
+  - id: FLD-CONTENTS
+    section: insuring_agreement
+    title: Flood damage to your belongings is covered if you bought contents coverage
+    text: >-
+      If the declarations show contents coverage, we pay for direct physical damage by flood to
+      personal property inside the insured building, up to the contents limit, after the contents
+      deductible. Without contents coverage we pay nothing for belongings.
+    edges:
+      - {type: uses_term, target: FLD-DEF-FLOOD}
+      - {type: subject_to, target: FLD-DEDUCTIBLE}
+      - {type: subject_to, target: FLD-LIMITS}
+
+  - id: FLD-DEF-FLOOD
+    section: definitions
+    title: What counts as a flood
+    text: >-
+      A flood is a general and temporary condition of partial or complete inundation of normally
+      dry land, for example from tidal water, an overflowing river, stream or lake, or an unusual
+      and rapid build-up of rainfall or snowmelt. Water that seeps in, backs up through drains
+      without a flood, or is driven by wind alone is not a flood under this policy.
+    edges:
+      - {type: has_exception, target: FLD-EXC-NOT-FLOOD}
+
+  - id: FLD-DEDUCTIBLE
+    section: limits
+    title: Separate deductibles for building and contents
+    text: >-
+      The building deductible and the contents deductible each apply separately to every flood
+      loss. We subtract the building deductible from the building damage and the contents
+      deductible from the contents damage before paying anything.
+    edges:
+      - {type: see_also, target: FLD-BELOW-DEDUCTIBLE}
+
+  - id: FLD-LIMITS
+    section: limits
+    title: We never pay more than the limits
+    text: >-
+      The most we pay for one flood loss is the building limit for the building and the contents
+      limit for contents, as shown on the declarations, whatever the size of the damage.
+    edges:
+      - {type: see_also, target: FLD-DEDUCTIBLE}
+
+  - id: FLD-BELOW-DEDUCTIBLE
+    section: limits
+    title: A loss at or below the deductible is not paid
+    text: >-
+      If the damage to the building or to contents does not exceed its deductible, we pay nothing
+      for that part. A claim where neither part exceeds its deductible is closed without payment.
+    edges:
+      - {type: subject_to, target: FLD-DEDUCTIBLE}
+
+  - id: FLD-EXC-BEFORE-INCEPTION
+    section: exclusions
+    title: Damage before the policy began is not covered
+    text: >-
+      We do not pay for a flood loss that happened before this policy started, or for damage that
+      was already present when it started.
+    edges:
+      - {type: see_also, target: FLD-COND-LOSS-IN-PROGRESS}
+
+  - id: FLD-COND-LOSS-IN-PROGRESS
+    section: conditions
+    title: A flood already under way when coverage starts
+    text: >-
+      If a flood was already in progress when this policy took effect, damage from that flood is not
+      covered. Whether a flood was in progress is decided by an adjuster from the facts.
+    edges:
+      - {type: see_also, target: FLD-EXC-BEFORE-INCEPTION}
+
+  - id: FLD-EXC-NOT-FLOOD
+    section: exclusions
+    title: Water damage that is not a flood
+    text: >-
+      We do not pay for seepage, sewer or drain backup that a flood did not cause, hydrostatic
+      pressure, wind or wind-driven rain, earth movement such as landslide or subsidence, or fire.
+      Deciding which cause did the damage needs an adjuster's inspection.
+    edges:
+      - {type: overridden_by, target: FLD-DEF-FLOOD}
+
+  - id: FLD-COND-PROOF
+    section: conditions
+    title: The damage must be documented
+    text: >-
+      You must show us the damage and give us the amounts claimed for the building and for
+      contents. We settle a claim on the damage our adjuster documents; if the damage cannot be
+      documented, the claim is reviewed by an adjuster before any payment.
+    edges:
+      - {type: see_also, target: FLD-BUILDING}

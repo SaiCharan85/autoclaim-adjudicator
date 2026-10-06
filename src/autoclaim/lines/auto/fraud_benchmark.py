@@ -172,6 +172,12 @@ def run_arm(
 # ---------------------------------------------------------------- metrics
 
 
+def scorable(y: np.ndarray, arms: dict[str, np.ndarray]) -> bool:
+    """True when the claims every arm scored include both frauds and non-frauds."""
+    ok = np.all([np.isfinite(s) for s in arms.values()], axis=0)
+    return bool(ok.any()) and 0 < int(y[ok].sum()) < int(ok.sum())
+
+
 def summarize(
     y: np.ndarray,
     arms: dict[str, np.ndarray],
@@ -288,6 +294,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{r.arm}: {r.requests} live requests, {r.tokens} tokens, {status}")
     scores = {"ml": np.array([s.model_score for s in signals])}
     scores |= {r.arm: np.array(r.scores, dtype=float) for r in runs}
+    if not scorable(y, scores):
+        print(
+            "quota stopped the LLM arms before both classes were scored: nothing to report "
+            "yet (and nothing logged); re-run tomorrow, finished batches come from the cache"
+        )
+        return 2
     rate = population_rate(frame, spec, args.final)
     metrics, diffs = summarize(y, scores, rate, fcfg.review_budget, args.seed)
     print(metrics.round(3).to_string())

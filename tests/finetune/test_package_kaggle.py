@@ -24,3 +24,17 @@ def test_dataset_metadata() -> None:
 
 def test_only_train_and_validation_files_are_uploaded() -> None:
     assert all(f.endswith(("_train.jsonl", "_val.jsonl")) for f in pk.FILES)
+
+
+def test_export_only_kernel_is_separate_and_runs_the_export_entry() -> None:
+    meta = pk.kernel_metadata("alice", export_only=True)
+    assert meta["id"] == "alice/autoclaim-finetune-export"  # training run's outputs untouched
+    assert meta["code_file"] == "export_on_kaggle.py" and meta["enable_gpu"] == "true"
+    assert (SCRIPT.parents[1] / "kaggle" / "export_on_kaggle.py").exists()
+
+
+def test_flatten_adapter_names(tmp_path: Path) -> None:
+    for name in ("adapter_config.json", "adapter_model.safetensors", "README.md"):
+        (tmp_path / name).write_text("x")
+    names = [n for _, n in pk.flatten_adapter(tmp_path, "intake")]
+    assert names == ["intake_lora__adapter_config.json", "intake_lora__adapter_model.safetensors"]

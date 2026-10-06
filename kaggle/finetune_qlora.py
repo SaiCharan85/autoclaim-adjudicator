@@ -148,6 +148,19 @@ def ollama_modelfile(gguf_name: str, task: str) -> str:
             "PARAMETER num_ctx 4096\n")  # fmt: skip
 
 
+def find_gguf(task_dir: Path) -> Path | None:
+    """The exported GGUF wherever Unsloth wrote it (it appends "_gguf" to the target folder)."""
+    found = sorted(task_dir.rglob("*.gguf"), key=lambda p: p.stat().st_size)
+    return found[-1] if found else None
+
+
+def write_modelfile(gguf: Path, task: str) -> Path:
+    """An Ollama Modelfile next to the GGUF, referring to it by its real name."""
+    path = gguf.parent / "Modelfile"
+    path.write_text(ollama_modelfile(gguf.name, task), encoding="utf-8")
+    return path
+
+
 def done_marker(out_dir: Path, task: str, stage: str) -> Path:
     return out_dir / task / f".done_{stage}"
 
@@ -244,12 +257,16 @@ def train(task: str, model: Any, tok: Any, train_rows: list[dict[str, Any]],
 
 
 def export(task: str, model: Any, tok: Any, out: Path) -> str:
-    target = out / task / "gguf"
-    model.save_pretrained_gguf(str(target), tok, quantization_method="q4_k_m")
-    ggufs = sorted(target.glob("*.gguf"))
-    name = ggufs[-1].name if ggufs else "model-q4_k_m.gguf"
-    (target / "Modelfile").write_text(ollama_modelfile(name, task), encoding="utf-8")
-    return name
+    import shutil
+
+    # the merge needs ~8 GB of scratch: free the training checkpoints first (20 GB disk on Kaggle)
+    shutil.rmtree(out / task / "checkpoints", ignore_errors=True)
+    model.save_pretrained_gguf(str(out / task / "gguf"), tok, quantization_method="q4_k_m")
+    gguf = find_gguf(out / task)
+    if gguf is None:
+        raise RuntimeError(f"{task}: GGUF export produced no .gguf file")
+    write_modelfile(gguf, task)
+    return str(gguf.relative_to(out))
 
 
 def versions() -> dict[str, str]:
@@ -272,6 +289,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--eval-n", type=int, default=120, help="held-out examples scored per task")
     ap.add_argument("--max-len", type=int, default=2560)
     ap.add_argument("--skip-base-eval", action="store_true")
+    ap.add_argument(
+        "--train-eval-n",
+        type=int,
+        default=150,
+        help="validation examples for the training loss (early stopping)",
+    )
+    ap.add_argument(
+        "--export-only", action="store_true", help="only export GGUF from <data>/<task>_lora"
+    )
     args = ap.parse_args(argv)
 
     import torch
@@ -283,6 +309,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     log.update({"gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none",
                 "base_model": BASE_MODEL, "versions": versions(), "seed": SEED})  # fmt: skip
     session_start = time.time()
+    if args.export_only:
+        from unsloth import FastLanguageModel
+
+        for task in args.tasks:
+            model, tok = FastLanguageModel.from_pretrained(str(data_dir / f"{task}_lora"),
+                                                           max_seq_length=args.max_len,
+                                                           load_in_4bit=True)  # fmt: skip
+            log.setdefault(task, {})["gguf"] = export(task, model, tok, out)
+            log_path.write_text(json.dumps(log, indent=1))
+            del model
+            torch.cuda.empty_cache()
+        log.setdefault("session_minutes", []).append(round((time.time() - session_start) / 60, 1))
+        log_path.write_text(json.dumps(log, indent=1))
+        print(json.dumps({t: log.get(t, {}).get("gguf") for t in args.tasks}))
+        return 0
     for task in args.tasks:
         entry = log.setdefault(task, {})
         tr = read_jsonl(data_dir / f"{task}_train.jsonl")
@@ -295,7 +336,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             done_marker(out, task, "base_eval").touch()
             log_path.write_text(json.dumps(log, indent=1))
         if not done_marker(out, task, "train").exists():
-            result = train(task, model, tok, tr, va, out, args.max_len)
+            result = train(task, model, tok, tr, va[: args.train_eval_n], out, args.max_len)
             model = result.pop("model")
             entry["train"] = result
             done_marker(out, task, "train").touch()

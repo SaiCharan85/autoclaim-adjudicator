@@ -16,11 +16,13 @@ import argparse
 import json
 import shutil
 import sys
+from pathlib import Path
 
 from autoclaim.paths import REPO_ROOT, data_dir
 
 SLUG = "autoclaim-finetune"
 KERNEL_SLUG = f"{SLUG}-run"  # a kernel may not reuse the dataset's slug (Kaggle answers 409)
+EXPORT_SLUG = f"{SLUG}-export"  # export-only runs keep the training run's outputs intact
 FILES = ("intake_train.jsonl", "intake_val.jsonl", "judge_train.jsonl", "judge_val.jsonl")
 
 
@@ -29,11 +31,12 @@ def dataset_metadata(user: str) -> dict[str, object]:
             "licenses": [{"name": "CC0-1.0"}]}  # fmt: skip
 
 
-def kernel_metadata(user: str) -> dict[str, object]:
+def kernel_metadata(user: str, export_only: bool = False) -> dict[str, object]:
+    slug = EXPORT_SLUG if export_only else KERNEL_SLUG
     return {
-        "id": f"{user}/{KERNEL_SLUG}",
-        "title": KERNEL_SLUG,
-        "code_file": "run_on_kaggle.py",
+        "id": f"{user}/{slug}",
+        "title": slug,
+        "code_file": "export_on_kaggle.py" if export_only else "run_on_kaggle.py",
         "language": "python",
         "kernel_type": "script",
         "is_private": "true",
@@ -47,9 +50,21 @@ def kernel_metadata(user: str) -> dict[str, object]:
     }
 
 
+def flatten_adapter(lora: Path, task: str) -> list[tuple[Path, str]]:
+    """Adapter files as flat dataset names `<task>_lora__<file>` (datasets have no folders)."""
+    return [(p, f"{task}_lora__{p.name}") for p in sorted(lora.iterdir())
+            if p.is_file() and p.name != "README.md"]  # fmt: skip
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--user", required=True, help="your Kaggle username")
+    ap.add_argument(
+        "--export-only",
+        metavar="TASK",
+        choices=["intake"],
+        help="upload models/finetune/out/TASK/lora; the kernel only exports it",
+    )
     args = ap.parse_args()
     src = data_dir() / "finetune"
     missing = [f for f in FILES if not (src / f).exists()]
@@ -65,9 +80,20 @@ def main() -> int:
         shutil.copy2(src / f, ds / f)
     for f in ("finetune_qlora.py", "requirements-finetune.txt"):
         shutil.copy2(REPO_ROOT / "kaggle" / f, ds / f)
-    shutil.copy2(REPO_ROOT / "kaggle" / "run_on_kaggle.py", kn / "run_on_kaggle.py")
+    export = bool(args.export_only)
+    if export:
+        lora = REPO_ROOT / "models" / "finetune" / "out" / args.export_only / "lora"
+        if not (lora / "adapter_config.json").exists():
+            print(f"no adapter at {lora}: download the training run's output first")
+            return 1
+        for f in flatten_adapter(lora, args.export_only):
+            shutil.copy2(f[0], ds / f[1])
+    entry = "export_on_kaggle.py" if export else "run_on_kaggle.py"
+    shutil.copy2(REPO_ROOT / "kaggle" / entry, kn / entry)
     (ds / "dataset-metadata.json").write_text(json.dumps(dataset_metadata(args.user), indent=1))
-    (kn / "kernel-metadata.json").write_text(json.dumps(kernel_metadata(args.user), indent=1))
+    (kn / "kernel-metadata.json").write_text(
+        json.dumps(kernel_metadata(args.user, export), indent=1)
+    )
     size = sum(p.stat().st_size for p in ds.iterdir()) / 1e6
     print(f"dataset: {ds} ({size:.1f} MB, private)\nkernel:  {kn} (GPU, internet on)")
     print("push with:\n"

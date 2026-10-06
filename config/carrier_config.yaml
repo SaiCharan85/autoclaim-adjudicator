@@ -97,6 +97,18 @@ router:
   fraud_review_score: 0.24     # approve with fraud score >= this -> human (= top 5% of validation claims, the SIU budget)
   authority_limit_usd: 15000   # auto-approval authority per claim
 
+# Flood line (Step 8.5, real FEMA NFIP claims): its own router thresholds. Flood losses run larger
+# than auto, so the auto-approval authority is higher; payouts above it always get a human.
+flood:
+  router:
+    min_confidence: 0.7
+    fraud_review_score: 1.0      # no flood fraud model: never triggers
+    authority_limit_usd: 50000
+  budgets:
+    max_llm_calls: 6             # template mode makes none; LLM mode: explanation + judge, retried
+    max_tokens: 30000
+  test_start: "2024-07-01"       # flood locked test: losses on or after this date (scored once)
+
 # Per-claim caps: crossing one trips the claim to human review (cost is always $0: free tiers).
 budgets:
   max_llm_calls: 14            # 5 nodes x up to 3 adjudication attempts, with headroom
@@ -124,10 +136,14 @@ models:
     # The docs don't publish 3.x free limits (AI Studio shows them per project): conservative guesses.
     "google:gemini-3.8-flash": {family: gemini, efforts: [minimal, low, medium, high], rpm: 10, rpd: 250, tpm: 250000}
     "google:gemini-3.5-flash-lite": {family: gemini, efforts: [minimal, low, medium, high], rpm: 15, rpd: 1000, tpm: 250000}
+    # Local fine-tuned Qwen3-4B (Step 7.5, docs/finetune.md) on Ollama: $0, no quota, ~30 s per call on
+    # this CPU. Last in their chains: used only when every free API model is out of quota.
+    "ollama:autoclaim-judge": {family: qwen}
+    "ollama:autoclaim-intake": {family: qwen}
   roles:     # fallback chain; spread across free models so one day's quota covers a full eval run
-    intake: {chain: ["google:gemini-3.5-flash-lite", "groq:openai/gpt-oss-20b"], max_tokens: 900, reasoning_effort: low}
+    intake: {chain: ["google:gemini-3.5-flash-lite", "groq:openai/gpt-oss-20b", "ollama:autoclaim-intake"], max_tokens: 900, reasoning_effort: low}
     coverage: {chain: ["google:gemini-3.8-flash", "groq:openai/gpt-oss-20b"], max_tokens: 1200, reasoning_effort: low}
     fraud: {chain: ["groq:openai/gpt-oss-20b", "google:gemini-3.5-flash-lite"], max_tokens: 2500, reasoning_effort: low}
     adjudicator: {chain: ["groq:openai/gpt-oss-120b", "groq:qwen/qwen3.8-27b", "google:gemini-3.8-flash"], max_tokens: 1500, reasoning_effort: low}
-    judge: {chain: ["google:gemini-3.8-flash", "groq:qwen/qwen3.8-27b", "groq:openai/gpt-oss-20b"], max_tokens: 800, reasoning_effort: low}   # never the adjudicator's family (enforced per call)
+    judge: {chain: ["google:gemini-3.8-flash", "groq:qwen/qwen3.8-27b", "groq:openai/gpt-oss-20b", "ollama:autoclaim-judge"], max_tokens: 800, reasoning_effort: low}   # never the adjudicator's family (enforced per call)
     synthetic_generator: {chain: ["google:gemini-3.5-flash-lite", "groq:openai/gpt-oss-20b"], max_tokens: 2500, reasoning_effort: minimal}
