@@ -76,6 +76,7 @@ class ClaimScore(BaseModel):
     failsafe: bool
     llm_calls: int
     tokens: int
+    adjudicator_model: str | None = None  # behind the final proposal (quota fallbacks differ)
 
     @property
     def correct(self) -> bool:
@@ -112,6 +113,12 @@ def quota_exhausted(final_state: dict[str, Any]) -> bool:
     return "every model failed" in reason and any(m in reason for m in QUOTA_MARKERS)
 
 
+def adjudicator_model(events: Sequence[dict[str, Any]]) -> str | None:
+    """Model of the last adjudicator event that called one (a retry may fall back mid-claim)."""
+    models = [e.get("model") for e in events if e.get("node") == "adjudicator" and e.get("model")]
+    return str(models[-1]) if models else None
+
+
 def score(final_state: dict[str, Any], truth: Truth, arm: str) -> ClaimScore:
     """Score one finished graph run (`final` set: auto-decided, or resumed by the adjuster)."""
     final = final_state["final"]
@@ -128,6 +135,7 @@ def score(final_state: dict[str, Any], truth: Truth, arm: str) -> ClaimScore:
         failsafe=bool(final_state.get("failsafe")),
         llm_calls=int(final_state.get("llm_calls", 0)),
         tokens=int(final_state.get("tokens", 0)),
+        adjudicator_model=adjudicator_model(final_state.get("audit", [])),
     )
 
 
@@ -244,4 +252,26 @@ def markdown_table(arms: dict[str, Sequence[ClaimScore]], n_boot: int = 2000, se
             d = paired(arms[base], arms[other], m, n_boot, seed)
             pct = not m.endswith("per_claim")
             lines.append(f"| {m} | {fmt(d, pct)} | {'yes' if d.excludes(0.0) else 'no'} |")
-    return "\n".join(lines)
+    return "\n".join(lines + by_model_table(arms))
+
+
+BY_MODEL_METRICS = ("auto_rate", "auto_accuracy", "proposal_accuracy")
+
+
+def by_model_table(arms: dict[str, Sequence[ClaimScore]]) -> list[str]:
+    """Point estimates per arm and adjudicator model; empty when every claim used one model.
+    Free-tier quota makes the adjudicator fall back mid-run, so arms can mix models."""
+    models = sorted({s.adjudicator_model or "none" for a in arms.values() for s in a})
+    if len(models) < 2:
+        return []
+    lines = ["", "By adjudicator model (quota fallbacks; point estimates, small n):", "",
+             "| arm | model | n | " + " | ".join(BY_MODEL_METRICS) + " |",
+             "|---|---|---|" + "---|" * len(BY_MODEL_METRICS)]  # fmt: skip
+    for arm, scores in arms.items():
+        for m in models:
+            group = [s for s in scores if (s.adjudicator_model or "none") == m]
+            if group:
+                vals = [metric(group, k) for k in BY_MODEL_METRICS]
+                cells = " | ".join("n/a" if v is None else f"{v:.1%}" for v in vals)
+                lines.append(f"| {arm} | {m} | {len(group)} | {cells} |")
+    return lines

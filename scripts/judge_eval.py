@@ -20,7 +20,7 @@ from pathlib import Path
 import judgekit
 from dotenv import load_dotenv
 
-from autoclaim.config import load_carrier_config
+from autoclaim.config import load_carrier_config, without_providers
 from autoclaim.core.judge import ClientLLM, load_rubric
 from autoclaim.lines.auto import judge_eval as je
 from autoclaim.lines.auto.build import RUBRIC_PATH
@@ -58,13 +58,16 @@ def main() -> int:
     ap.add_argument(
         "--final", action="store_true", help="test period; logged in docs/test_set_log.md"
     )
+    ap.add_argument("--rerun-final", action="store_true", help="allow a second locked-test look")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--boot", type=int, default=2000)
     args = ap.parse_args()
 
-    cfg = load_carrier_config()
+    cfg = without_providers(load_carrier_config(), frozenset({"ollama"}))  # API models only
     seed = cfg.harness.seed if args.seed is None else args.seed
     name = "eval" if args.final else "dev"
+    if args.final and not args.dry_run:
+        test_log.guard_final("judge planted errors (claims, H2 2024)", "catch", args.rerun_final)
     start, end = PERIODS[name]
     policy = load_policy(POLICY_PATH)
     rubric = load_rubric(RUBRIC_PATH)

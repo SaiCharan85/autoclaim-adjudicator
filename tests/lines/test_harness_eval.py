@@ -157,3 +157,35 @@ def test_ablated_critic() -> None:
 )  # fmt: skip
 def test_quota_exhaustion_is_not_scored_as_an_escalation(failsafe, stop) -> None:
     assert he.quota_exhausted({"failsafe": failsafe}) is stop
+
+
+# ---------------------------------------------------------------- adjudicator model
+
+
+def test_adjudicator_model_is_the_last_adjudicator_call() -> None:
+    events = [{"node": "intake", "model": "google:x"},
+              {"node": "adjudicator", "model": "groq:a"},
+              {"node": "adjudicator", "model": None},  # failed safe: no model
+              {"node": "adjudicator", "model": "groq:b"},
+              {"node": "judge", "model": "google:y"}]  # fmt: skip
+    assert he.adjudicator_model(events) == "groq:b"
+    assert he.adjudicator_model([{"node": "adjudicator", "model": None}]) is None
+    assert he.adjudicator_model([]) is None
+
+
+def test_score_records_adjudicator_model_and_old_scores_still_load() -> None:
+    st = state("A", "auto", "approve", 1650.0) | {"audit": [{"node": "adjudicator", "model": "m1"}]}
+    assert he.score(st, APPROVE, "full").adjudicator_model == "m1"
+    old = s("B", APPROVE, "auto", "approve", 1650.0).model_dump(exclude={"adjudicator_model"})
+    assert he.ClaimScore.model_validate(old).adjudicator_model is None
+
+
+def test_by_model_table_only_when_models_mix() -> None:
+    a = s("A", APPROVE, "auto", "approve", 1650.0)
+    one = [a.model_copy(update={"adjudicator_model": "m1"})]
+    assert he.by_model_table({"full": one}) == []
+    mixed = [*one, s("B", DENY_TRAP, "human", "deny")]  # no model -> "none"
+    rows = he.by_model_table({"full": mixed})
+    assert any(r == "| full | m1 | 1 | 100.0% | 100.0% | 100.0% |" for r in rows)
+    assert any(r.startswith("| full | none | 1 | 0.0% | n/a |") for r in rows)
+    assert "By adjudicator model" in he.markdown_table({"full": mixed}, n_boot=50)

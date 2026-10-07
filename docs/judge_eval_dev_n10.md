@@ -8,10 +8,10 @@ Judge `judge`, rubric `adjudication_reasoning` v1.1, seed 42.
 |---|---|---|---|---|
 | contradicted_conclusion | 10 | 10 | 90.0% | 90.0% |
 | invented_fact | 10 | 10 | 100.0% | 100.0% |
-| misstated_coverage | 9 | 7 | 100.0% | 100.0% |
+| misstated_coverage | 9 | 8 | 100.0% | 100.0% |
 | omitted_material_fact | 10 | 8 | 50.0% | 25.0% |
 | wrong_amount | 5 | 5 | 100.0% | 60.0% |
-| all planted | 44 | 40 | 87.5% | 77.5% |
+| all planted | 44 | 41 | 87.8% | 78.0% |
 
 False alarms on clean samples: 20.0% (2 of 10 judged; 0 unavailable).
 
@@ -20,8 +20,8 @@ False alarms on clean samples: 20.0% (2 of 10 judged; 0 unavailable).
 | metric | value | 95% CI |
 |---|---|---|
 | false_alarm | 20.0% | [0.0%, 50.0%] |
-| catch | 87.5% | [76.7%, 97.2%] |
-| catch_expected | 77.5% | [65.0%, 87.8%] |
+| catch | 87.8% | [76.9%, 97.4%] |
+| catch_expected | 78.0% | [65.9%, 88.1%] |
 | catch:contradicted_conclusion | 90.0% | [70.0%, 100.0%] |
 | catch_expected:contradicted_conclusion | 90.0% | [70.0%, 100.0%] |
 | catch:invented_fact | 100.0% | [100.0%, 100.0%] |
@@ -51,7 +51,7 @@ False alarms on clean samples: 20.0% (2 of 10 judged; 0 unavailable).
   "numbers_consistent": 1
  },
  "misstated_coverage": {
-  "faithful_to_clauses": 7,
+  "faithful_to_clauses": 8,
   "facts_supported": 1
  },
  "omitted_material_fact": {
@@ -68,4 +68,4 @@ False alarms on clean samples: 20.0% (2 of 10 judged; 0 unavailable).
 }
 ```
 
-4 cases were unavailable (quota); re-run to fill them in.
+3 cases were unavailable (quota); re-run to fill them in.

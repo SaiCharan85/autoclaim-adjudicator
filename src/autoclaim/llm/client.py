@@ -35,6 +35,9 @@ T = TypeVar("T", bound=BaseModel)
 
 MAX_RATE_LIMIT_WAIT_S = 30.0
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
+# Some models (e.g. Gemma 4 on AI Studio) always think first, inline as <thought>...</thought>,
+# which can itself contain JSON-like drafts: drop it before reading the answer.
+_THOUGHT = re.compile(r"<thought>.*?</thought>", re.DOTALL)
 
 
 @dataclass
@@ -71,7 +74,8 @@ def system_prompt(instructions: str, schema: type[BaseModel]) -> str:
 
 
 def parse_json(text: str, schema: type[T]) -> T:
-    return schema.model_validate_json(_FENCE.sub("", text.strip()))
+    """The answer object: thought blocks and code fences removed first."""
+    return schema.model_validate_json(_FENCE.sub("", _THOUGHT.sub("", text).strip()))
 
 
 class LLMClient:
@@ -111,8 +115,16 @@ class LLMClient:
         return ChatRequest(
             model=key.partition(":")[2],
             messages=tuple(messages),
-            max_tokens=rc.max_tokens,
+            max_tokens=self._max_tokens(key, rc.max_tokens),
             reasoning_effort=effort if effort in self.cfg.catalog[key].efforts else None,
+        )
+
+    def _max_tokens(self, key: str, wanted: int) -> int:
+        """The role's cap, lowered under the model's per-minute output limit (if it has one)."""
+        limits = self.cfg.catalog[key]
+        total = wanted + limits.thinking_tokens
+        return (
+            total if limits.otpm is None else min(total, int(limits.otpm * self.cfg.safety_margin))
         )
 
     def estimate_tokens(self, role: str, system: str, user: str) -> int:

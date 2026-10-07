@@ -134,3 +134,23 @@ def test_memory_cutoff_never_passes_the_locked_test_boundary() -> None:
     test_start = cfg.fraud_model.datasets[cfg.fraud_model.production_dataset].test_start
     assert test_start is not None and cfg.memory.cutoff <= test_start
     assert cfg.memory.few_shot_k == 0  # few-shot stays off until an A/B shows it helps
+
+
+def test_without_providers_drops_local_models_from_every_chain() -> None:
+    from autoclaim.config import without_providers
+
+    cfg = load_carrier_config()
+    assert cfg.models.roles["judge"].chain[-1] == "ollama:autoclaim-judge"
+    api = without_providers(cfg, frozenset({"ollama"}))
+    for rc in api.models.roles.values():
+        assert not any(m.startswith("ollama:") for m in rc.chain)
+    assert cfg.models.roles["judge"].chain[-1] == "ollama:autoclaim-judge"  # original untouched
+
+
+def test_without_providers_refuses_an_empty_role() -> None:
+    import pytest
+
+    from autoclaim.config import without_providers
+
+    with pytest.raises(ValueError, match="no model left"):
+        without_providers(load_carrier_config(), frozenset({"google", "groq", "ollama"}))

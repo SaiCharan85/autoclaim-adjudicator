@@ -41,6 +41,20 @@ def test_happy_path_meta_and_request() -> None:
     assert req.messages[0].role == "system" and '"label"' in req.messages[0].content
 
 
+@pytest.mark.parametrize(("otpm", "sent"), [(40, 40), (100, 50)])
+def test_max_tokens_stays_under_the_output_per_minute_limit(otpm, sent) -> None:
+    client, prov = _client([GOOD], otpm=otpm)
+    _call(client)
+    assert prov["a"].requests[0].max_tokens == sent
+
+
+@pytest.mark.parametrize(("otpm", "sent"), [(None, 80), (70, 70)])
+def test_thinking_models_get_their_allowance_on_top_still_under_otpm(otpm, sent) -> None:
+    client, prov = _client([GOOD], thinking_tokens=30, otpm=otpm)
+    _call(client)
+    assert prov["a"].requests[0].max_tokens == sent
+
+
 def test_second_identical_call_is_free() -> None:
     client, prov = _client([GOOD])
     _call(client)
@@ -114,3 +128,10 @@ def test_pinned_chain_never_falls_back() -> None:
     assert prov["b"].requests == []
     with pytest.raises(KeyError):
         _call(client, chain=["a:unknown"])
+
+
+def test_parse_json_drops_an_inline_thought_block_with_json_drafts() -> None:
+    reply = '<thought>* draft: `{"label": "draft"}`\n* final below</thought>' + GOOD
+    assert parse_json(reply, Out).label == "ok"
+    fenced = "<thought>x</thought>\n```json\n" + GOOD + "\n```"
+    assert parse_json(fenced, Out).label == "ok"

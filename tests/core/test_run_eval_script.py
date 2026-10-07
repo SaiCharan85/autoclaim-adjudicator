@@ -56,3 +56,26 @@ def test_scores_checkpoint_round_trip(tmp_path) -> None:
     (loaded,) = run_eval.load_scores(path)
     assert loaded.claim_id == "C3" and loaded.correct
     assert run_eval.load_scores(tmp_path / "missing.jsonl") == []
+
+
+class QuotaLine(FakeLine):
+    """The adjudicator's whole chain is out of free-tier quota on the first attempt only."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.out_of_quota = True
+
+    def adjudicate(self, state):
+        if self.out_of_quota:
+            raise RuntimeError("role 'adjudicator': every model failed: ['m: daily safety limit']")
+        return super().adjudicate(state)
+
+
+def test_quota_stop_is_not_finalized_and_the_retry_starts_clean(tmp_path) -> None:
+    adj, line = Adjuster(), QuotaLine()
+    app = app_for(tmp_path, line)
+    out = run_eval.run_claim(app, {"claim_id": "C4"}, adj)
+    assert he.quota_exhausted(out) and "final" not in out and adj.asked == []
+    line.out_of_quota = False  # the quota reset overnight
+    out = run_eval.run_claim(app, {"claim_id": "C4"}, adj)
+    assert not out.get("failsafe") and out["final"]["decided_by"] == "auto"

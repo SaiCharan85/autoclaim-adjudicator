@@ -28,10 +28,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--n", type=int, default=3000, help="claims sampled from the period")
     ap.add_argument("--final", action="store_true", help="locked test period (logged)")
+    ap.add_argument("--rerun-final", action="store_true", help="allow a second locked-test look")
     ap.add_argument("--boot", type=int, default=1000)
     args = ap.parse_args()
     cfg = load_carrier_config()
     test_start = (cfg.model_extra or {})["flood"]["test_start"]
+    if args.final:
+        test_log.guard_final(
+            f"flood (FEMA NFIP, losses >= {test_start})", "auto_rate", args.rerun_final
+        )
     claims = fema_nfip.load(raw_dir("fema_nfip"))
     period = claims["dateOfLoss"] >= test_start if args.final else claims["dateOfLoss"] < test_start
     pool = claims[period]

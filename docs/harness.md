@@ -19,7 +19,7 @@ Example: a deer strike.
      - the total-loss test (estimate ≥ 75% of the car's value);
      - payout = estimate (or the car's value if it's a total loss) − deductible.
 3. **coverage ∥ fraud** (in parallel)
-   - **coverage** (Gemini 3.8 Flash):
+   - **coverage** (Gemma 4 26B; Gemini 3.8 Flash before 2026-10-06):
      - **Retrieval:** a hybrid BM25 + bge-large search (FAISS HNSW) over the policy, merged by rank (RRF), returns the top 5 clauses. Then 1 hop through the policy graph adds up to 6 linked clauses: conditions and exceptions first, then definitions.
      - **Reading:** the LLM returns the coverage part, exclusions, unmet conditions and a reasoning chain that cites clause ids. Ids it wasn't given are dropped and logged.
    - **fraud** (tools; LLM only if the claim scores high)
@@ -74,7 +74,8 @@ Two claims needed one retry. The judge (Qwen, after a Gemini rate-limit fallback
 |---|---|---|
 | groq gpt-oss-120b | 900 requests, 180k tokens | adjudicator (~3.5k tokens/claim) |
 | groq gpt-oss-20b / qwen3.8-27b | 180k tokens each | fallbacks, fraud explanation |
-| gemini-3.8-flash | 225 requests (estimated: confirm in AI Studio) | coverage, judge |
+| gemma-4-26b-a4b-it | 6.5k requests, 13.5k tokens/min (assumed: half the Gemma 3 free tier) | coverage, judge (since 2026-10-06) |
+| gemini-3.8-flash | 225 requests (estimated: confirm in AI Studio) | late fallback (was coverage, judge) |
 | gemini-3.5-flash-lite | 900 requests (estimated) | intake, narrative generation |
 
 About 4–6 calls and 7–12k tokens per claim, so **one day's free quota covers about 40–50 claims** before the adjudicator falls back. A 300-claim eval with ablations takes several days. The exact-match cache makes re-runs free, so runs resume where they stopped.

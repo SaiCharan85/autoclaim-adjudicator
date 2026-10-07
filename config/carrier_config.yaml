@@ -131,19 +131,28 @@ models:
   catalog:   # "<provider>:<model id>" -> family (judge must differ from adjudicator) + free limits
     "groq:openai/gpt-oss-120b": {family: gpt-oss, efforts: [low, medium, high], rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
     "groq:openai/gpt-oss-20b": {family: gpt-oss, efforts: [low, medium, high], rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
-    "groq:qwen/qwen3.8-27b": {family: qwen, efforts: [], rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000}
+    # otpm: Groq's 429 says 'output tokens per minute (OTPM): Limit 1000' (2026-10-06); requests asking
+    # for more max_tokens are refused outright, so the client lowers max_tokens under it
+    "groq:qwen/qwen3.8-27b": {family: qwen, efforts: [], rpm: 30, rpd: 1000, tpm: 8000, tpd: 200000, otpm: 1000}
     # Gemini 2.5 is closed to new API keys (HTTP 404, 2026-10-04); 3.x stable models are free.
     # The docs don't publish 3.x free limits (AI Studio shows them per project): conservative guesses.
     "google:gemini-3.8-flash": {family: gemini, efforts: [minimal, low, medium, high], rpm: 10, rpd: 250, tpm: 250000}
     "google:gemini-3.5-flash-lite": {family: gemini, efforts: [minimal, low, medium, high], rpm: 15, rpd: 1000, tpm: 250000}
+    # Gemma 4 on AI Studio (2026-10-06): free, higher daily quota than Flash, a different family from the
+    # adjudicator's. It always thinks first (<thought> block, cannot be turned off; the parser drops it).
+    # Free limits are not published via the API: assumed conservatively (half the Gemma 3 free tier).
+    # gemma-4-31b-it returned HTTP 500 on every call (2026-10-06), so it is not used.
+    # thinking_tokens: its thinking used all of the judge's 800 max_tokens (empty answer, one retry),
+    # so it gets this much on top of every role's cap.
+    "google:gemma-4-26b-a4b-it": {family: gemma, efforts: [], rpm: 15, rpd: 7200, tpm: 15000, thinking_tokens: 2048}
     # Local fine-tuned Qwen3-4B (Step 7.5, docs/finetune.md) on Ollama: $0, no quota, ~30 s per call on
     # this CPU. Last in their chains: used only when every free API model is out of quota.
     "ollama:autoclaim-judge": {family: qwen}
     "ollama:autoclaim-intake": {family: qwen}
   roles:     # fallback chain; spread across free models so one day's quota covers a full eval run
     intake: {chain: ["google:gemini-3.5-flash-lite", "groq:openai/gpt-oss-20b", "ollama:autoclaim-intake"], max_tokens: 900, reasoning_effort: low}
-    coverage: {chain: ["google:gemini-3.8-flash", "groq:openai/gpt-oss-20b"], max_tokens: 1200, reasoning_effort: low}
+    coverage: {chain: ["google:gemma-4-26b-a4b-it", "google:gemini-3.5-flash-lite", "groq:openai/gpt-oss-20b", "google:gemini-3.8-flash"], max_tokens: 1200, reasoning_effort: low}
     fraud: {chain: ["groq:openai/gpt-oss-20b", "google:gemini-3.5-flash-lite"], max_tokens: 2500, reasoning_effort: low}
-    adjudicator: {chain: ["groq:openai/gpt-oss-120b", "groq:qwen/qwen3.8-27b", "google:gemini-3.8-flash"], max_tokens: 1500, reasoning_effort: low}
-    judge: {chain: ["google:gemini-3.8-flash", "groq:qwen/qwen3.8-27b", "groq:openai/gpt-oss-20b", "ollama:autoclaim-judge"], max_tokens: 800, reasoning_effort: low}   # never the adjudicator's family (enforced per call)
+    adjudicator: {chain: ["groq:openai/gpt-oss-120b", "groq:qwen/qwen3.8-27b", "google:gemma-4-26b-a4b-it", "google:gemini-3.8-flash"], max_tokens: 1500, reasoning_effort: low}
+    judge: {chain: ["google:gemma-4-26b-a4b-it", "google:gemini-3.5-flash-lite", "groq:qwen/qwen3.8-27b", "groq:openai/gpt-oss-20b", "google:gemini-3.8-flash", "ollama:autoclaim-judge"], max_tokens: 800, reasoning_effort: low}   # never the adjudicator's family (enforced per call)
     synthetic_generator: {chain: ["google:gemini-3.5-flash-lite", "groq:openai/gpt-oss-20b"], max_tokens: 2500, reasoning_effort: minimal}

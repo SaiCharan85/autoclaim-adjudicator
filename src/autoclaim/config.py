@@ -111,6 +111,11 @@ class ModelLimits(BaseModel):
     rpd: int | None = Field(default=None, gt=0)
     tpm: int | None = Field(default=None, gt=0)
     tpd: int | None = Field(default=None, gt=0)
+    # output tokens per minute: Groq rejects any request whose max_tokens exceeds it outright
+    otpm: int | None = Field(default=None, gt=0)
+    # extra completion budget for models that always think before answering (thinking counts
+    # against max_tokens, so without it the answer gets cut off)
+    thinking_tokens: int = Field(default=0, ge=0)
     efforts: list[str] = []  # reasoning_effort values it accepts; others are not sent
 
 
@@ -149,6 +154,18 @@ class MemoryConfig(BaseModel):
     few_shot_k: int = Field(default=0, ge=0)
     cutoff: date  # never remember cases on or after this date (the evaluation period)
     path: str = ".cache/memory/feedback.sqlite3"
+
+
+def without_providers(cfg: "CarrierConfig", providers: frozenset[str]) -> "CarrierConfig":
+    """A copy whose role chains skip the given providers (e.g. evaluations measure the API models
+    only: no local fallback mixed into an arm). A role left with no model is an error."""
+    roles = {}
+    for name, rc in cfg.models.roles.items():
+        chain = [m for m in rc.chain if m.partition(":")[0] not in providers]
+        if not chain:
+            raise ValueError(f"role {name!r} has no model left without {sorted(providers)}")
+        roles[name] = rc.model_copy(update={"chain": chain})
+    return cfg.model_copy(update={"models": cfg.models.model_copy(update={"roles": roles})})
 
 
 class CarrierConfig(BaseModel):

@@ -23,6 +23,9 @@ from autoclaim.core.lob import LineOfBusiness, MemoryStore, NodeResult, NoMemory
 from autoclaim.core.router import RouterConfig, route_claim
 from autoclaim.core.state import ClaimState
 
+# A fallback chain's error names every model's failure (one 429 body is ~400 chars): keep all.
+FAILSAFE_CHARS = 2000
+
 
 class HarnessConfig(BaseModel):
     max_retries: int = Field(ge=0)
@@ -65,7 +68,7 @@ class Harness:
             try:
                 res = fn(state)
             except Exception as exc:  # fail safe: never let a broken node produce a decision
-                reason = f"{name}: {type(exc).__name__}: {str(exc)[:300]}"
+                reason = f"{name}: {type(exc).__name__}: {str(exc)[:FAILSAFE_CHARS]}"
                 event = self._event(state, name, status="failsafe", outputs={"error": reason})
                 return {"failsafe": reason, "audit": [event]}
             calls = len(res.calls)

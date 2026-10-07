@@ -160,7 +160,7 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
   + fraud A/B: ML-only vs LLM-only vs hybrid on ~200 test claims (cached; user decision 2026-10-04)
 - ☑ Step 8.5 — Flood line on real FEMA NFIP claims (docs/flood.md): `lines/flood/` on the unchanged core; locked test agreement 98.6%, wrongly denied/paid 0.3%/0.3%, auto 41.4% ($50k authority)
 - ☑ Step 9 — Adjuster console: `ui/console.py` (Streamlit 1.65) over tested `ui/review_view.py`; queue, case view, decision form -> `core.review.resume`, audit trail; AppTest smoke passes
-- ☐ Step 10 — Polish (final README, architecture doc, playbook, CI badge, limitations)
+- ◐ Step 10 — Polish: README (trace, results, docs index, CI badge), docs/architecture.md, docs/playbook.md, docs/limitations.md done; final numbers update after Step 8 live runs
 
 Decisions 2026-10-04: two-stage fraud triage (first notice + independent appraisal) for >= 80% TRUE-fraud
 interception: locked test 78.3% at 10.0% review rate, ROC-AUC 0.860 / 0.955 after the shop-estimate realism fix (model card); one OpenAI-compatible httpx adapter for all providers (no vendor SDKs);

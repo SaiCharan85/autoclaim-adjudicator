@@ -254,12 +254,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=cfg.harness.seed)
     ap.add_argument("--dry-run", action="store_true", help="estimate requests/tokens/time only")
     ap.add_argument("--final", action="store_true", help="locked test period (logged)")
+    ap.add_argument("--rerun-final", action="store_true", help="allow a second locked-test look")
     ap.add_argument("--retrain", action="store_true", help="refit the train-only ML model")
     args = ap.parse_args(argv)
     if args.model not in cfg.models.catalog:
         ap.error(f"--model {args.model!r} is not in the model catalog")
 
     spec = get_spec(args.dataset, fcfg)
+    if args.final and not args.dry_run:
+        test_log.guard_final(spec.name, f"fraud LLM benchmark n={args.n}", args.rerun_final)
     raw = spec.load_raw()
     frame = spec.prepare(raw)
     pool = benchmark_pool(frame, spec, args.final)

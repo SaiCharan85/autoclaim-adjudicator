@@ -108,7 +108,9 @@ def test_happy_path_auto_decides_with_audit(tmp_path) -> None:
     assert {"coverage", "fraud", "critic", "judge", "router"} <= set(nodes)
     assert out["llm_calls"] == 4 and out["tokens"] == 4 * 110
     on_disk = harness.audit.read("C1")
-    assert [e.node for e in on_disk] == nodes  # append-only file mirrors the state
+    # append-only file mirrors the state; parallel coverage/fraud may hit the disk in either order
+    assert sorted(e.node for e in on_disk) == sorted(nodes)
+    assert on_disk[0].node == "guardrails" and on_disk[-1].node == "auto_decide"
 
 
 def test_critic_failure_retries_with_issues(tmp_path) -> None:
@@ -188,3 +190,12 @@ def test_llm_fallback_errors_are_audited(tmp_path) -> None:
     *_, out = _run(Flaky(), tmp_path)
     judge = next(e for e in out["audit"] if e["node"] == "judge")
     assert judge["outputs"]["llm_errors"] == ["g:m: rate limited"]
+
+
+def test_failsafe_reason_keeps_every_model_in_a_long_fallback_chain(tmp_path) -> None:
+    class ChainFails(FakeLine):
+        def coverage(self, state):
+            raise RuntimeError("every model failed: ['a: " + "x" * 500 + "', 'b: rate limited']")
+
+    *_, out = _run(ChainFails(), tmp_path)
+    assert out["failsafe"].endswith("'b: rate limited']")

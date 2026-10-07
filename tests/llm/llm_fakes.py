@@ -33,7 +33,7 @@ class FakeClock:
         self.t += s
 
 
-def models_cfg(**limits: int) -> ModelsConfig:
+def models_cfg(**limits: int | None) -> ModelsConfig:
     lim = {"rpm": 30, "rpd": 100, "tpm": 100_000, "tpd": 1_000_000} | limits
     return ModelsConfig(
         safety_margin=1.0,

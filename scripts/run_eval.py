@@ -27,7 +27,8 @@ from typing import Any
 import pandas as pd
 from dotenv import load_dotenv
 
-from autoclaim.config import load_carrier_config
+from autoclaim.config import load_carrier_config, without_providers
+from autoclaim.core.audit import AuditSink
 from autoclaim.core.review import resume
 from autoclaim.lines.auto import harness_eval as he
 from autoclaim.lines.auto.build import build
@@ -43,6 +44,7 @@ ARMS = ("full", "no_judge", "no_critic", "few_shot")
 NEW_CALLS = {"full": 4.5, "no_judge": 0.3, "no_critic": 0.8, "few_shot": 2.3}
 TOKENS_PER_CALL = 2700
 FEW_SHOT_K = 3
+LOCAL_PROVIDERS = frozenset({"ollama"})
 
 
 def packages(name: str, start: str, end: str) -> list[dict[str, Any]]:
@@ -55,21 +57,37 @@ def run_claim(app: Any, pkg: dict[str, Any], adjuster: OracleAdjuster) -> dict[s
     cid = pkg["claim_id"]
     config = {"configurable": {"thread_id": cid}}
     out: dict[str, Any] = app.graph.invoke({"claim_id": cid, "claim": pkg}, config)
+    if he.quota_exhausted(out):
+        # Not a real outcome: never let the adjuster finalize it, and drop the thread so the
+        # sticky `failsafe` does not come back when the claim is retried after the quota resets.
+        app.graph.checkpointer.delete_thread(cid)
+        return out
     if "final" not in out:
         out = resume(app.graph, cid, adjuster.decide(out["__interrupt__"][0].value))
     return out
 
 
 def load_scores(path: Path) -> list[he.ClaimScore]:
+    """One arm's scored claims; scores written before `adjudicator_model` existed get it from the
+    arm's audit trail."""
     if not path.exists():
         return []
-    return [he.ClaimScore.model_validate_json(x) for x in path.read_text("utf-8").splitlines() if x]
+    out = [he.ClaimScore.model_validate_json(x) for x in path.read_text("utf-8").splitlines() if x]
+    audit = AuditSink(path.parent / "audit")
+
+    def model(cid: str) -> str | None:
+        return he.adjudicator_model([e.model_dump() for e in audit.read(cid)])
+
+    return [s if s.adjudicator_model
+            else s.model_copy(update={"adjudicator_model": model(s.claim_id)})
+            for s in out]  # fmt: skip
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--set", choices=["dev", "eval"], default="dev")
     ap.add_argument("--final", action="store_true", help="required for the test-period set")
+    ap.add_argument("--rerun-final", action="store_true", help="allow a second locked-test look")
     ap.add_argument("--arms", nargs="+", choices=ARMS, default=["full"])
     ap.add_argument("--n", type=int, default=50)
     ap.add_argument(
@@ -85,8 +103,12 @@ def main() -> int:
     args = ap.parse_args()
     if args.set == "eval" and not args.final:
         ap.error("the eval set is the locked test period: pass --final (it is logged)")
+    if args.final and not args.dry_run:
+        test_log.guard_final("harness (claims, H2 2024)", f"arm {args.arms[0]}", args.rerun_final)
 
-    cfg = load_carrier_config()
+    # evaluations measure the API models only: no local fallback mixed into an arm; a quota-out
+    # stops the run (resume tomorrow) instead
+    cfg = without_providers(load_carrier_config(), LOCAL_PROVIDERS)
     split = cfg.fraud_model.datasets[cfg.fraud_model.production_dataset]
     val, test = str(split.val_start), str(split.test_start)
     claims = sim_build.load("claims")

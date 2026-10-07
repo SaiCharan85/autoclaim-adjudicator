@@ -35,6 +35,28 @@ def code_version(repo: Path = REPO_ROOT) -> str:
     return f"{head}+dirty" if dirty else head
 
 
+def already_used(dataset: str, headline_prefix: str, path: Path | None = None) -> bool:
+    """True if the log already has a run of this evaluation (same dataset, same headline start)."""
+    path = path or DEFAULT_LOG
+    if not path.exists():
+        return False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 4 and cells[1] == dataset and cells[3].startswith(headline_prefix):
+            return True
+    return False
+
+
+def guard_final(dataset: str, headline_prefix: str, rerun: bool, path: Path | None = None) -> None:
+    """Refuse a second look at a locked test unless asked for explicitly (`--rerun-final`)."""
+    if already_used(dataset, headline_prefix, path) and not rerun:
+        raise SystemExit(
+            f"locked test already used for {dataset!r} ({headline_prefix!r}, see "
+            "docs/test_set_log.md): refusing a second look; pass --rerun-final only with a "
+            "documented reason"
+        )
+
+
 def append(
     dataset: str, headline: str, path: Path | None = None, version: str | None = None
 ) -> None:
