@@ -14,3 +14,4 @@ Every evaluation on a locked test set is appended here automatically (`scripts/t
 | 2026-10-06 16:43 | sim_us | 60f90e1+dirty | fraud LLM benchmark n=200: ml ROC-AUC 0.855, llm ROC-AUC 0.631, hybrid ROC-AUC 0.853 |
 | 2026-10-07 03:18 | sim_us | 60f90e1+dirty | fraud LLM benchmark n=200: ml ROC-AUC 0.855, llm ROC-AUC 0.631, hybrid ROC-AUC 0.853 |
 | 2026-10-07 03:25 | note | - | The 03:18 fraud LLM benchmark row is an accidental re-run of the 16:43 run (a resumed pipeline still held its --final step). All calls came from the exact-match cache with the same seed: identical numbers, no new information, no decision changed. One real look at this test. |
+| 2026-10-08 16:02 | harness (claims, H2 2024) | 31db280+dirty | arm full: auto_rate 0.5533333333333333, auto_accuracy 0.9759036144578314, n=300 |

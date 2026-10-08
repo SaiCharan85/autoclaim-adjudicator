@@ -21,6 +21,11 @@ from autoclaim.core.decision import HumanDecision
 OUTCOMES = ("approve", "deny", "escalate")
 
 
+def _amount(value: Any) -> float:
+    """A dollar amount, or 0.0 for None or NaN (NaN is truthy, so `x or 0.0` misses it)."""
+    return 0.0 if value is None or pd.isna(value) else float(value)
+
+
 class OracleAdjuster:
     def __init__(
         self, claims: pd.DataFrame, error_rate: float = 0.05, seed: int = 0, name: str = "oracle"
@@ -50,7 +55,7 @@ class OracleAdjuster:
         if rng.random() < self.error_rate:
             outcome = rng.choice([o for o in OUTCOMES if o != outcome])
             proposed = request.get("proposed_decision") or {}
-            payout = (proposed.get("payout") or float(row["gt_payout"]) or 0.0
+            payout = (_amount(proposed.get("payout")) or _amount(row["gt_payout"])
                       if outcome == "approve" else None)  # fmt: skip
             reasons = ["judgment_call"]
             self.errors.add(claim_id)

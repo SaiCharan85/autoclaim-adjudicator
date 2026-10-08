@@ -27,6 +27,7 @@ from autoclaim.llm.types import (
     Message,
     ProviderError,
     RateLimitedError,
+    TransientProviderError,
 )
 from autoclaim.llm.usage import UsageLedger, estimate_tokens
 from autoclaim.paths import REPO_ROOT
@@ -34,6 +35,8 @@ from autoclaim.paths import REPO_ROOT
 T = TypeVar("T", bound=BaseModel)
 
 MAX_RATE_LIMIT_WAIT_S = 30.0
+# waits before retrying the same model after a 5xx or network error (Gemma 4 returns sporadic 500s)
+TRANSIENT_RETRY_WAITS_S = (5.0, 15.0)
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
 # Some models (e.g. Gemma 4 on AI Studio) always think first, inline as <thought>...</thought>,
 # which can itself contain JSON-like drafts: drop it before reading the answer.
@@ -127,6 +130,27 @@ class LLMClient:
             total if limits.otpm is None else min(total, int(limits.otpm * self.cfg.safety_margin))
         )
 
+    def _chat_with_retries(
+        self, provider: ChatProvider, key: str, request: ChatRequest, est: int
+    ) -> ChatResult:
+        """One short rate-limit wait, or up to two waits after a transient server error."""
+        waits = list(TRANSIENT_RETRY_WAITS_S)
+        while True:
+            try:
+                return provider.chat(request)
+            except RateLimitedError as exc:
+                wait = exc.retry_after_s
+                if wait is None or wait > MAX_RATE_LIMIT_WAIT_S:
+                    raise
+                self.ledger.sleep(wait)
+                self.ledger.reserve(key, est)
+                return provider.chat(request)
+            except TransientProviderError:
+                if not waits:
+                    raise
+                self.ledger.sleep(waits.pop(0))
+                self.ledger.reserve(key, est)
+
     def estimate_tokens(self, role: str, system: str, user: str) -> int:
         """Worst-case tokens for one call (prompt estimate + max completion), for dry runs."""
         return estimate_tokens(system + user) + self.cfg.roles[role].max_tokens
@@ -140,15 +164,7 @@ class LLMClient:
         provider = self.providers[key.partition(":")[0]]
         est = estimate_tokens("".join(m.content for m in request.messages)) + request.max_tokens
         self.ledger.reserve(key, est)
-        try:
-            result = provider.chat(request)
-        except RateLimitedError as exc:
-            wait = exc.retry_after_s
-            if wait is None or wait > MAX_RATE_LIMIT_WAIT_S:
-                raise
-            self.ledger.sleep(wait)
-            self.ledger.reserve(key, est)
-            result = provider.chat(request)
+        result = self._chat_with_retries(provider, key, request, est)
         self.ledger.record(key, result.total_tokens or est)
         self.cache.put(ck, result)
         meta.cached = False

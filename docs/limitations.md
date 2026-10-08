@@ -34,6 +34,20 @@ What the results in the README do and do not show.
 - **Free tiers cap throughput** at about 40-50 harness claims per day, so the evaluations are pilots
   (tens of claims, wide confidence intervals) rather than thousands of claims. Free-tier models also
   change and get rate-limited without notice; one model returned quota errors for a whole day.
+- **The ablation arms used different adjudicator models.** When a model's daily quota ran out, the
+  harness fell back to the next one, so the arms mix gpt-oss-120b, qwen3.8-27b and Gemma 4 in
+  different proportions (the few-shot arm never got gpt-oss-120b). The report breaks results down
+  by model, but an arm difference can partly be a model difference. The few-shot arm also used a
+  feedback memory of only 23 episodes, because the memory build stopped on quota.
+- **The locked test ran mostly on Gemma 4.** Free Groq quota covered 46 of the 300 claims, so Gemma
+  4 adjudicated 239 (it was a fallback on dev, not the primary). The drop from dev to test (auto
+  accuracy 100% to 97.6%, proposal accuracy 96% to 85%) is partly this model shift and partly a new
+  period; the two can't be separated with this run. 3 of the 4 wrong automatic approvals came from
+  Gemma.
+- **Fraud that gets past the triage model gets paid.** 3 of 20 true frauds in the locked test were
+  approved without a human (15%, CI 0-33%): the fraud score was below the review threshold and
+  nothing else in the claim looked wrong. The two-stage triage catches about 78% of fraud by design,
+  so some leakage is expected; a lower threshold trades it for more human reviews.
 - **The local fallback is slow** on a CPU (about 17-34 seconds per call): fine for quota-out days,
   not for volume.
 

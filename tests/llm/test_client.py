@@ -4,7 +4,12 @@ from pydantic import BaseModel
 
 from autoclaim.llm.cache import LLMCache
 from autoclaim.llm.client import LLMClient, parse_json, system_prompt
-from autoclaim.llm.types import LLMUnavailableError, ProviderError, RateLimitedError
+from autoclaim.llm.types import (
+    LLMUnavailableError,
+    ProviderError,
+    RateLimitedError,
+    TransientProviderError,
+)
 from autoclaim.llm.usage import UsageLedger
 
 
@@ -135,3 +140,17 @@ def test_parse_json_drops_an_inline_thought_block_with_json_drafts() -> None:
     assert parse_json(reply, Out).label == "ok"
     fenced = "<thought>x</thought>\n```json\n" + GOOD + "\n```"
     assert parse_json(fenced, Out).label == "ok"
+
+
+def test_transient_server_error_retries_same_model_with_backoff() -> None:
+    err = TransientProviderError("HTTP 500")
+    client, prov = _client([err, err, GOOD])
+    res = _call(client)
+    assert res.meta.model == "a:m1" and len(prov["a"].requests) == 3
+    assert client.ledger.sleep.__self__.slept == [5.0, 15.0]
+
+
+def test_transient_errors_past_the_retries_fall_back() -> None:
+    errs = [TransientProviderError("500")] * 3
+    client, prov = _client(errs, [GOOD])
+    assert _call(client).meta.model == "b:m2" and len(prov["a"].requests) == 3

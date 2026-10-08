@@ -4,7 +4,13 @@ import httpx
 import pytest
 
 from autoclaim.llm.providers import OpenAICompatProvider, request_body
-from autoclaim.llm.types import ChatRequest, Message, ProviderError, RateLimitedError
+from autoclaim.llm.types import (
+    ChatRequest,
+    Message,
+    ProviderError,
+    RateLimitedError,
+    TransientProviderError,
+)
 
 REQ = ChatRequest(
     model="m", messages=(Message(role="user", content="hi"),), max_tokens=10, reasoning_effort="low"
@@ -67,6 +73,13 @@ def test_network_error_becomes_provider_error() -> None:
 
     with pytest.raises(ProviderError, match="ConnectError"):
         _provider(handler).chat(REQ)
+
+
+@pytest.mark.parametrize(("status", "transient"), [(500, True), (503, True), (400, False)])
+def test_server_errors_are_transient_client_errors_are_not(status: int, transient: bool) -> None:
+    with pytest.raises(ProviderError) as exc:
+        _provider(lambda r: httpx.Response(status, text="x")).chat(REQ)
+    assert isinstance(exc.value, TransientProviderError) is transient
 
 
 def test_missing_key_refused(monkeypatch: pytest.MonkeyPatch) -> None:

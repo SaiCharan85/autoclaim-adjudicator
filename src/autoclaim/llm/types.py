@@ -43,6 +43,10 @@ class ProviderError(LLMError):
     """The provider answered with an error, or could not be reached."""
 
 
+class TransientProviderError(ProviderError):
+    """A server error (5xx) or network failure that usually clears within seconds: worth a retry."""
+
+
 class RateLimitedError(ProviderError):
     def __init__(self, message: str, retry_after_s: float | None = None) -> None:
         super().__init__(message)

@@ -66,3 +66,13 @@ def test_unknown_claim_and_bad_rate() -> None:
         OracleAdjuster(TRUTH).decide(req("NOPE"))
     with pytest.raises(ValueError):
         OracleAdjuster(TRUTH, error_rate=1.5)
+
+
+def test_mistaken_approval_of_a_denial_with_no_payout_pays_zero_not_nan() -> None:
+    truth = TRUTH.assign(gt_payout=[1650.0, float("nan"), float("nan"), 900.5] * 50)
+    adj = OracleAdjuster(truth, error_rate=1.0, seed=0)
+    decided = [
+        adj.decide(req(c, {"outcome": "deny", "payout": None})) for c in truth["claim_id"][:40]
+    ]
+    flipped = [d for d in decided if d.outcome == "approve"]
+    assert flipped and all(d.payout == 0.0 for d in flipped)

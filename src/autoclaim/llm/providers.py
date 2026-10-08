@@ -7,7 +7,13 @@ from typing import Any, Protocol
 
 import httpx
 
-from autoclaim.llm.types import ChatRequest, ChatResult, ProviderError, RateLimitedError
+from autoclaim.llm.types import (
+    ChatRequest,
+    ChatResult,
+    ProviderError,
+    RateLimitedError,
+    TransientProviderError,
+)
 
 
 class ChatProvider(Protocol):
@@ -70,12 +76,15 @@ class OpenAICompatProvider:
         try:
             response = self._http.post("chat/completions", json=request_body(request))
         except httpx.HTTPError as exc:
-            raise ProviderError(f"{self.name}: {type(exc).__name__}: {exc}") from exc
+            raise TransientProviderError(f"{self.name}: {type(exc).__name__}: {exc}") from exc
         if response.status_code == 429:
             # the 429 body names the exact quota hit (Gemini: quotaMetric + quotaValue): keep it
             raise RateLimitedError(
                 f"{self.name}: rate limited: {response.text[:400]}", _retry_after(response)
             )
+        if response.status_code >= 500:
+            msg = f"{self.name}: HTTP {response.status_code}: {response.text[:300]}"
+            raise TransientProviderError(msg)
         if response.status_code >= 400:
             raise ProviderError(f"{self.name}: HTTP {response.status_code}: {response.text[:300]}")
         try:
