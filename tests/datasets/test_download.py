@@ -1,9 +1,11 @@
 import json
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
+from autoclaim.datasets import bls, fema_nfip
 from autoclaim.datasets import download as dl
 from autoclaim.datasets.sources import CRSS, CRSS_YEARS, DatasetSource, UrlSource
 
@@ -142,8 +144,21 @@ def test_main_defaults_to_all_sources(
     monkeypatch.setenv("AUTOCLAIM_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(dl, "SOURCES", {"toy": SOURCE})
     monkeypatch.setattr(dl, "URL_SOURCES", {})
+    # the API-backed sources are part of "all" too: stub them, tests never touch the network
+    fetched: list[str] = []
+
+    def fake(name: str) -> Callable[[Path], Path]:
+        def get(dest: Path) -> Path:
+            fetched.append(name)
+            return dest / f"{name}.csv"
+
+        return get
+
+    monkeypatch.setattr(bls, "download_cpi", fake("bls"))
+    monkeypatch.setattr(fema_nfip, "download", fake("fema"))
     assert dl.main([], api_factory=FakeKaggleApi) == 0
-    assert "[toy]" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "[toy]" in out and sorted(fetched) == ["bls", "fema"]
 
 
 def test_main_rejects_unknown_source() -> None:
