@@ -154,3 +154,9 @@ def test_without_providers_refuses_an_empty_role() -> None:
 
     with pytest.raises(ValueError, match="no model left"):
         without_providers(load_carrier_config(), frozenset({"google", "groq", "ollama"}))
+
+
+def test_fraud_review_line_reviews_about_ten_percent_of_claims() -> None:
+    # chosen on validation data (docs/harness.md): ~10% reviewed, ~64% of true fraud caught
+    router = load_carrier_config().model_extra["router"]
+    assert router["fraud_review_score"] == 0.12

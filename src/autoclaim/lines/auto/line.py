@@ -311,14 +311,25 @@ class AutoLine:
             "police_report_hours": facts.police_report_hours,
             "witness_count": facts.witnesses, "notice_days": derived.notice_days,
             "attorney_involved": facts.attorney_involved, "claimed_amount": pkg.estimate_amount,
-        }  # fmt: skip
+        } | self._appraisal_fields(pkg)  # fmt: skip
+
+    @staticmethod
+    def _appraisal_fields(pkg: ClaimPackage) -> dict[str, Any]:
+        """The independent appraisal, in the stage-2 model's schema (absent: no stage 2)."""
+        a = pkg.appraisal
+        if a is None:
+            return {}
+        flag = None if a.prior_damage is None else float(a.prior_damage)
+        return {"appraised_amount": a.appraised_amount, "appraiser_prior_damage": flag}
 
     def fraud(self, state: ClaimState) -> NodeResult:
         sig: FraudSignals = self.toolkit.assess(self.fraud_record(state))
         out: dict[str, Any] = {"signals": sig.model_dump(mode="json"),
                                "model_score": sig.model_score}  # fmt: skip
         calls = []
-        if sig.model_score >= self.fraud_review_score:  # the LLM only explains; skip if moot
+        flagged = (sig.two_stage_referral if sig.two_stage_referral is not None
+                   else sig.model_score >= self.fraud_review_score)  # fmt: skip
+        if flagged:  # the LLM only explains; skip if moot
             pkg = self.package(state)
             user = (f"signals: {_compact(sig.model_dump(mode='json'))}\n"
                     f"statement: {state['guardrails']['narrative']}\n"
@@ -481,6 +492,9 @@ class AutoLine:
         denied = decision.get("outcome") == "deny"
         if derived.late_notice and not denied:  # a clear exclusion wins over late notice
             out.append("late_notice")
+        signals = (state.get("fraud") or {}).get("signals") or {}
+        if signals.get("two_stage_referral") and decision.get("outcome") == "approve":
+            out.append("two_stage_fraud_referral")  # never pay before the fraud team looks
         if facts.loss_date is None:
             out.append("loss_date_unknown")
         if facts.cause == "unknown":
@@ -496,8 +510,12 @@ class AutoLine:
         return out
 
     def fraud_score(self, state: ClaimState) -> float | None:
+        """The first-notice score the router compares with its line; None when the two-stage
+        policy decided instead (an appraisal was available: see hard_escalations)."""
         fr = state.get("fraud")
-        return None if not fr else float(fr["model_score"])
+        if not fr or fr["signals"].get("two_stage_referral") is not None:
+            return None
+        return float(fr["model_score"])
 
     def case_summary(self, state: ClaimState) -> dict[str, Any]:
         """Everything an adjuster needs on one screen; deterministic, no LLM call."""

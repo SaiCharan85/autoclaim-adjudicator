@@ -49,7 +49,11 @@ What the results in the README do and do not show.
 - **Fraud that gets past the triage model gets paid.** 3 of 20 true frauds in the locked test were
   approved without a human (15%, CI 0-33%): the fraud score was below the review threshold and
   nothing else in the claim looked wrong. The two-stage triage catches about 78% of fraud by design,
-  so some leakage is expected; a lower threshold trades it for more human reviews.
+  so some leakage is expected. Afterwards the review line was lowered from 0.24 to 0.12 on
+  validation data (true fraud caught 49% -> 64%, reviews 5% -> 10%; docs/harness.md); the locked
+  test was not re-run, so its numbers are still those at 0.24. Claims that carry an independent
+  appraisal now use the two-stage triage (79.5% of true fraud referred at a 9.5% review rate on
+  validation); claims without one still rely on the first-notice model alone.
 - **The local fallback is slow** on a CPU (about 17-34 seconds per call): fine for quota-out days,
   not for volume.
 

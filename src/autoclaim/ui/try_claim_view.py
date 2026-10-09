@@ -14,7 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from autoclaim.datasets.nhtsa_complaints import Complaint
-from autoclaim.lines.auto.claim import ClaimPackage, PolicyRecord
+from autoclaim.lines.auto.claim import Appraisal, ClaimPackage, PolicyRecord
 
 Coverage = Literal["liability_only", "collision", "collision_comprehensive"]
 # rough actual cash value by vehicle age and type, only as a form default (the user can change it)
@@ -41,6 +41,9 @@ class ClaimForm(BaseModel):
     report_date: date
     estimate_amount: float = Field(gt=0)
     channel: Literal["phone", "web", "email", "app"] = "web"
+    # the independent appraisal, when there is one: fraud triage then uses the stage-2 model
+    appraised_amount: float | None = Field(default=None, gt=0)
+    appraiser_prior_damage: bool = False
 
 
 def acv_default(year: int, body: str, today: date) -> float:
@@ -117,7 +120,9 @@ def build_package(story: str, form: ClaimForm) -> dict[str, Any]:
         estimate_amount=form.estimate_amount,
         narrative=statement(story, form),
         policy=policy,
-    )
+        appraisal=None if form.appraised_amount is None else Appraisal(
+            appraised_amount=form.appraised_amount, prior_damage=form.appraiser_prior_damage),
+    )  # fmt: skip
     return pkg.model_dump(mode="json")
 
 
@@ -167,8 +172,20 @@ def trace(out: dict[str, Any], fraud_review_score: float) -> list[dict[str, str]
     carries = "carries" if on else "does not carry"
     steps.append({"title": "Matched the coverage", "status": "ok" if on else "bad",
                   "detail": f"A {part} loss; the policy {carries} {part} coverage."})  # fmt: skip
+    sig = (out.get("fraud") or {}).get("signals") or {}
     score = (out.get("fraud") or {}).get("model_score")
-    if isinstance(score, int | float):
+    if sig.get("two_stage_referral") is not None:
+        refer = bool(sig["two_stage_referral"])
+        steps.append(
+            {
+                "title": "Screened for fraud",
+                "status": "warn" if refer else "ok",
+                "detail": f"With the independent appraisal: first-notice score "
+                f"{score:.2f}, post-appraisal score {sig['stage2_score']:.2f} "
+                f"({'referred to the fraud team' if refer else 'cleared'}).",
+            }
+        )
+    elif isinstance(score, int | float):
         high = score >= fraud_review_score
         steps.append({"title": "Screened for fraud", "status": "warn" if high else "ok",
                       "detail": f"Fraud score {score:.2f} "

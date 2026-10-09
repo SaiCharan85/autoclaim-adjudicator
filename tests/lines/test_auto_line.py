@@ -19,8 +19,9 @@ from autoclaim.core.graph import Harness, HarnessConfig
 from autoclaim.core.judge import build_judge, load_rubric
 from autoclaim.core.router import RouterConfig
 from autoclaim.lines.auto.build import RUBRIC_PATH
+from autoclaim.lines.auto.claim import Appraisal
 from autoclaim.lines.auto.facts import derive
-from autoclaim.lines.auto.fraud_tools import FraudSignals
+from autoclaim.lines.auto.fraud_tools import FraudSignals, two_stage_refer
 from autoclaim.lines.auto.line import AutoLine, guard
 from autoclaim.lines.auto.policy import POLICY_PATH
 from autoclaim.llm.cache import LLMCache
@@ -285,3 +286,44 @@ def test_memory_text_before_intake_uses_the_story_and_report_date() -> None:
     pkg = package()
     desc = _line().memory_text({"claim_id": "X", "claim": pkg.model_dump(mode="json")})
     assert desc.text.startswith("unprocessed claim: ") and desc.when == pkg.report_date
+
+
+# ---------------------------------------------------------------- two-stage fraud triage
+
+
+@pytest.mark.parametrize(
+    ("s1", "s2", "refer"),
+    [(0.30, 0.01, True),  # top first-notice score: straight to the fraud team
+     (0.05, 0.20, True),  # appraisal exposes it
+     (0.05, 0.10, False), (0.2264, 0.0, True), (0.2263, 0.1744, False)],
+)  # fmt: skip
+def test_two_stage_refer(s1: float, s2: float, refer: bool) -> None:
+    assert two_stage_refer(s1, s2, 0.2264, 0.1745) is refer
+
+
+def test_appraisal_reaches_the_fraud_record_only_when_given() -> None:
+    assert "appraised_amount" not in _line().fraud_record(_state())
+    pkg = package().model_copy(update={"appraisal": Appraisal(appraised_amount=1200.0,
+                                                              prior_damage=True)})  # fmt: skip
+    rec = _line().fraud_record(_state(pkg=pkg))
+    assert rec["appraised_amount"] == 1200.0 and rec["appraiser_prior_damage"] == 1.0
+
+
+def _with_signals(state: dict, **sig: object) -> dict:
+    base = {"model_score": 0.30, "two_stage_referral": None}
+    return state | {"fraud": {"model_score": 0.30, "signals": base | sig}}
+
+
+def test_two_stage_decides_instead_of_the_first_notice_line() -> None:
+    line = _line()
+    plain = _with_signals(_state(decision=_decision()))
+    assert line.fraud_score(plain) == 0.30  # no appraisal: the router's line applies
+    referred = _with_signals(_state(decision=_decision()), two_stage_referral=True)
+    assert line.fraud_score(referred) is None
+    assert "two_stage_fraud_referral" in line.hard_escalations(referred)
+    cleared = _with_signals(_state(decision=_decision()), two_stage_referral=False)
+    assert line.fraud_score(cleared) is None  # a high first-notice score alone no longer refers
+    assert "two_stage_fraud_referral" not in line.hard_escalations(cleared)
+    denied = _with_signals(_state(decision=DENY_EXCLUDED | {"payout": None}),
+                           two_stage_referral=True)  # fmt: skip
+    assert "two_stage_fraud_referral" not in line.hard_escalations(denied)  # nothing to pay

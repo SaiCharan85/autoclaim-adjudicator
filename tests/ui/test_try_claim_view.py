@@ -183,3 +183,25 @@ def test_missing_fields_names_every_empty_required_detail() -> None:
 def test_no_made_up_policyholder_name() -> None:
     assert tv.form_from_complaint(complaint(), TODAY).policyholder == ""
     assert tv.generic_form(TODAY).policyholder == ""
+
+
+def test_appraisal_goes_into_the_claim_only_when_entered() -> None:
+    assert ClaimPackage.model_validate(tv.build_package(STORY, form())).appraisal is None
+    pkg = ClaimPackage.model_validate(
+        tv.build_package(STORY, form(appraised_amount=3100.0, appraiser_prior_damage=True))
+    )
+    assert pkg.appraisal is not None and pkg.appraisal.appraised_amount == 3100.0
+    assert pkg.appraisal.prior_damage is True
+
+
+def test_trace_shows_the_two_stage_screen() -> None:
+    run = {
+        **RUN,
+        "fraud": {
+            "model_score": 0.05,
+            "signals": {"two_stage_referral": True, "stage2_score": 0.41},
+        },
+    }
+    step = next(s for s in tv.trace(run, 0.12) if s["title"] == "Screened for fraud")
+    assert step["status"] == "warn" and "post-appraisal score 0.41" in step["detail"]
+    assert "referred to the fraud team" in step["detail"]

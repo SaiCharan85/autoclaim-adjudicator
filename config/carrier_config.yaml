@@ -46,6 +46,7 @@ fraud_model:
     stage1_budget: 0.05        # top 5% at first notice -> fraud team (SIU)
     target_true_recall: 0.80   # user target: intercept >= 80% of TRUE fraud
     stage2_threshold: 0.174461 # re-fit on validation after appraisal.shop_sigma (2026-10-04); frozen
+    stage1_cut_score: 0.226416 # top 5% stage-1 score on validation (scripts/validate_two_stage.py, 2026-10-09); frozen
   datasets:
     sim_us:
       val_start: "2024-01-01"
@@ -94,7 +95,7 @@ deductibles: {}
 # Routing (code, after hard rules): anything here sends the claim to a human adjuster.
 router:
   min_confidence: 0.7          # adjudicator's self-reported confidence below this -> human
-  fraud_review_score: 0.24     # approve with fraud score >= this -> human (= top 5% of validation claims, the SIU budget)
+  fraud_review_score: 0.12     # approve with fraud score >= this -> human: ~10% of validation claims reviewed, 64% of true fraud caught (was 0.24: 5%, 49%; docs/harness.md)
   authority_limit_usd: 15000   # auto-approval authority per claim
 
 # Flood line (Step 8.5, real FEMA NFIP claims): its own router thresholds. Flood losses run larger

@@ -294,6 +294,17 @@ with st.form("claim", border=True):
                                start("report_date"),
                                help="Over 30 days after the loss needs an adjuster")  # fmt: skip
         channel = st.selectbox("Reported by", ["web", "phone", "email", "app"])
+        appraisal = st.number_input(
+            "Independent appraisal ($) :gray[● optional]",
+            1.0,
+            500_000.0,
+            None,
+            step=100.0,
+            placeholder="if an appraiser inspected it",
+            help="The insurer's own appraiser's figure. When given, the "
+            "stronger post-appraisal fraud model screens the claim",
+        )
+        prior = st.checkbox("Appraiser found prior damage")
     with c2:
         show(f"<b>{icon('car', 16)} Vehicle</b>")
         year = st.number_input(tagged("Year", sources["vehicle_year"]), 1990, today.year + 1,
@@ -336,7 +347,8 @@ if go:
               "vehicle_year": year, "vehicle_make": vmake.strip(),
               "vehicle_model": vmodel.strip(), "body_class": body, "vehicle_acv": acv,
               "loss_date": loss, "report_date": report, "estimate_amount": estimate,
-              "channel": channel}  # fmt: skip
+              "channel": channel, "appraised_amount": appraisal,
+              "appraiser_prior_damage": prior}  # fmt: skip
     gaps = missing_fields(values)
     if gaps:
         st.error("Fill in: " + ", ".join(gaps) + ".")

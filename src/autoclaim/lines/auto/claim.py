@@ -52,6 +52,13 @@ class PolicyRecord(BaseModel):
     address_change_days: int | None  # days since the insured's last move; None = none in 2 years
 
 
+class Appraisal(BaseModel):
+    """The independent appraiser's findings (known after first notice, before payment)."""
+
+    appraised_amount: float = Field(gt=0)
+    prior_damage: bool | None = None  # damage that predates this loss
+
+
 class ClaimPackage(BaseModel):
     claim_id: str
     channel: Literal["phone", "web", "email", "app"]
@@ -59,6 +66,7 @@ class ClaimPackage(BaseModel):
     estimate_amount: float = Field(gt=0)
     narrative: str
     policy: PolicyRecord
+    appraisal: Appraisal | None = None  # when present, fraud triage uses the stage-2 model
 
 
 class DriverAtLoss(BaseModel):

@@ -24,7 +24,7 @@ Example: a deer strike.
      - **Reading:** the LLM returns the coverage part, exclusions, unmet conditions and a reasoning chain that cites clause ids. Ids it wasn't given are dropped and logged.
    - **fraud** (tools; LLM only if the claim scores high)
      - CatBoost score, SHAP reasons, Isolation Forest percentile and red-flag rules.
-     - The LLM only writes the explanation, and only when the score is ≥ 0.24 (the top 5%). Below that, an LLM explanation can't change the route, so the call is skipped.
+     - The LLM only writes the explanation, and only when the score is ≥ 0.12 (about the top 10%). Below that, an LLM explanation can't change the route, so the call is skipped.
 4. **adjudicator** (gpt-oss-120b)
    - Returns a `Decision` with a self-check.
    - **The payout is overwritten with the computed payout.** What the LLM stated is kept for the audit log.
@@ -42,7 +42,7 @@ Example: a deer strike.
    - Judge quality is measured with planted errors: `scripts/judge_eval.py` (catch rate per error type, false alarms, bootstrap CIs).
 7. **router** (code)
    - Hard rules first: late notice (unless clearly denied), unknown cause, driver or loss date, unclear hit-and-run report timing, input flags.
-   - Then thresholds: confidence < 0.7, approve with fraud score ≥ 0.24, payout > $15,000, the adjudicator escalated, checks failed, or a failsafe fired.
+   - Then thresholds: confidence < 0.7, approve with fraud score ≥ 0.12, payout > $15,000, the adjudicator escalated, checks failed, or a failsafe fired.
 8. **auto_decide** or **human_review**
    - Both finalize through an idempotent ledger: the first finalization wins, and a re-run returns the stored decision instead of paying twice.
    - `human_review` calls `interrupt()` with a ready case summary. The SQLite checkpointer keeps the claim paused until the console or the oracle adjuster resumes it with `Command(resume=...)`.
@@ -85,3 +85,32 @@ About 4–6 calls and 7–12k tokens per claim, so **one day's free quota covers
 - **HNSW search loses nothing:** recall vs exact search is 1.0.
 - **bge-base scored slightly higher than bge-large** on these 60 queries (context recall 0.92 vs 0.89, 3× faster). That's within noise for 60 queries. bge-large stays, as the user chose.
 - **The queries were written by the same author as the policy**, so absolute numbers are optimistic. The comparison between configurations is what counts.
+
+## Fraud review line (2026-10-09)
+
+An approval with a first-notice fraud score at or above the line goes to a person. Measured on the
+8,284 validation-period claims (638 true frauds); the locked test was not used:
+
+| Line | Claims reviewed | True fraud caught | Fraud that could be auto-paid | Honest approvals delayed |
+|---|---|---|---|---|
+| 0.24 (before) | 4.8% | 48.9% | 51.1% | 1.2% |
+| 0.18 | 6.5% | 56.0% | 44.0% | 2.6% |
+| 0.14 | 8.4% | 61.3% | 38.7% | 4.4% |
+| **0.12 (now)** | 9.6% | 63.9% | 36.1% | 5.7% |
+| 0.10 | 11.6% | 66.8% | 33.2% | 7.7% |
+| 0.06 | 19.3% | 77.0% | 23.0% | 16.4% |
+
+0.12 matches the 10% review budget the two-stage triage uses. The fraud explanation (an LLM call)
+uses the same line, so it now runs for about 10% of claims. The locked-test harness results in
+`eval/report_eval.md` were measured at the earlier line of 0.24.
+
+### With an independent appraisal: two-stage triage
+
+A claim can carry the insurer's independent appraisal (`ClaimPackage.appraisal`: appraised amount,
+prior damage). Then the fraud node also scores the post-appraisal model and applies the frozen
+two-stage policy instead of the line above: refer when the first-notice score is in the top 5%
+(>= 0.2264) or the post-appraisal score >= 0.1745; a referred approval goes to a person
+(`two_stage_fraud_referral`). On validation (`scripts/validate_two_stage.py`,
+[fraud_two_stage_harness.md](fraud_two_stage_harness.md)): **79.5%** of true fraud referred at a
+9.5% review rate, against 61.3% at 10.0% from the first notice alone; the line's fraud node
+matched the policy on 298 of 300 sampled claims.

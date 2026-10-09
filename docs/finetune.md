@@ -93,7 +93,7 @@ uses), with the deterministic payout.
 - 650 train-period examples, 150 validation-period; approvals 35%, the rest spread evenly over the
   9 deny/escalate reasons (~47 each), so rare reasons are not swamped.
 - A fraud escalation is a target only when the fraud score in the prompt is at or above the review
-  threshold (0.24). True fraud with a low score looks like any other claim to the adjudicator, so
+  threshold in force when the data was built (0.24). True fraud with a low score looks like any other claim to the adjudicator, so
   those claims are left out rather than teaching it to escalate at random.
 - `missing_information` escalations are left out: gold facts have nothing missing.
 

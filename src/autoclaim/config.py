@@ -71,6 +71,9 @@ class TriageConfig(BaseModel):
     stage1_budget: float = Field(gt=0, lt=1)
     target_true_recall: float = Field(gt=0, le=1)
     stage2_threshold: float | None = None  # None until fitted on validation
+    # stage-1 score at the top `stage1_budget` share of validation claims: the harness applies the
+    # policy one claim at a time, so the share becomes a fixed score cut (fitted on validation)
+    stage1_cut_score: float | None = None
 
 
 class FraudModelConfig(BaseModel):
