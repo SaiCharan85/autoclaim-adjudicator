@@ -27,7 +27,9 @@ What the results in the README do and do not show.
   firm conclusions (its 20% false-alarm rate rests on 2 of 10 cases).
 - **The simulated adjuster is the truth with 5% noise.** Real adjusters disagree with each other far
   more, so feedback memory is tested in an easy setting.
-- **Adjudicator distillation was deferred**: only the intake extractor and the judge were fine-tuned.
+- **The fine-tuned adjudicator learned from gold targets, not a teacher model.** Its prompts come
+  from a perfect intake and coverage step, so its 99% outcome accuracy is an upper bound; live,
+  noisier inputs will score lower. It is also slow on this CPU (~1 minute per decision).
 
 ## Scale and cost
 

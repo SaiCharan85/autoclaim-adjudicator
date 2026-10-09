@@ -1,7 +1,7 @@
-"""QLoRA fine-tuning of the local intake extractor and small judge (Step 7.5). Free GPU only.
+"""QLoRA fine-tuning of the local intake extractor, small judge and adjudicator. Free GPU only.
 
 One GPU session does everything (load once, no idle time):
-  for each task (judge, intake):
+  for each task (judge, intake, adjudicator; `--tasks` picks):
     1. score the BASE model on held-out validation examples (for the base-vs-fine-tuned ablation)
     2. QLoRA-train on the train split, early stopping on validation loss, checkpoint every 50 steps
     3. score the FINE-TUNED model on the same held-out examples
@@ -33,8 +33,14 @@ BASE_MODEL = "unsloth/Qwen3-4B-Instruct-2507-unsloth-bnb-4bit"
 CHAT_TEMPLATE = "qwen3-instruct"
 INSTRUCTION_PART = "<|im_start|>user\n"
 RESPONSE_PART = "<|im_start|>assistant\n"
-TASKS = ("judge", "intake")
-EPOCHS = {"judge": 2, "intake": 3}
+TASKS = ("judge", "intake", "adjudicator")
+DEFAULT_TASKS = ("judge", "intake")
+EPOCHS = {"judge": 2, "intake": 3, "adjudicator": 2}
+MAX_NEW = {"judge": 700, "intake": 900, "adjudicator": 700}
+# adjudicator prompts carry ~2.5k tokens of clauses: a longer window, and batch 1 x 8 (the same
+# effective batch) so a T4's 16 GB holds it
+MAX_LEN = {"adjudicator": 3584}
+BATCH = {"judge": (2, 4), "intake": (2, 4), "adjudicator": (1, 8)}
 SEED = 42
 
 # ---------------------------------------------------------------- pure helpers (tested on CPU)
@@ -139,13 +145,43 @@ def score_intake(predictions: Sequence[str], references: Sequence[str]) -> dict[
             "per_field": per_field}  # fmt: skip
 
 
+def score_adjudicator(predictions: Sequence[str], references: Sequence[str]) -> dict[str, Any]:
+    """JSON validity, outcome accuracy, exact reason codes, cited-clause recall, payout match on
+    approvals (production overwrites it anyway) and wrong approvals (the costly error)."""
+    valid = outcome = reasons = approvals = payout_ok = wrong_approve = not_approve = 0
+    recall: list[float] = []
+    for pred, ref in zip(predictions, references, strict=True):
+        want = json.loads(ref)
+        got = extract_json(pred) or {}
+        valid += "outcome" in got
+        outcome += got.get("outcome") == want["outcome"]
+        reasons += sorted(got.get("reasons") or []) == sorted(want["reasons"])
+        if want["cited_clauses"]:
+            cited = set(got.get("cited_clauses") or [])
+            recall.append(len(cited & set(want["cited_clauses"])) / len(want["cited_clauses"]))
+        if want["outcome"] == "approve":
+            approvals += 1
+            p = got.get("payout")
+            payout_ok += isinstance(p, int | float) and abs(float(p) - want["payout"]) <= 1.0
+        else:
+            not_approve += 1
+            wrong_approve += got.get("outcome") == "approve"
+    n = len(predictions)
+    return {"n": n, "json_valid": valid / n if n else None,
+            "outcome_accuracy": outcome / n if n else None,
+            "reasons_exact": reasons / n if n else None,
+            "cited_recall": sum(recall) / len(recall) if recall else None,
+            "payout_match": payout_ok / approvals if approvals else None,
+            "wrong_approve_rate": wrong_approve / not_approve if not_approve else None}  # fmt: skip
+
+
 def ollama_modelfile(gguf_name: str, task: str) -> str:
     """Modelfile for `ollama create`; greedy decoding, the task's longest answers fit."""
-    num_predict = 700 if task == "judge" else 900
+    num_ctx = 6144 if task == "adjudicator" else 4096
     return (f"FROM ./{gguf_name}\n"
             "PARAMETER temperature 0\n"
-            f"PARAMETER num_predict {num_predict}\n"
-            "PARAMETER num_ctx 4096\n")  # fmt: skip
+            f"PARAMETER num_predict {MAX_NEW[task]}\n"
+            f"PARAMETER num_ctx {num_ctx}\n")  # fmt: skip
 
 
 def find_gguf(task_dir: Path) -> Path | None:
@@ -199,10 +235,12 @@ def generate(model: Any, tok: Any, examples: Sequence[dict[str, Any]], max_new: 
 
 
 def evaluate(task: str, model: Any, tok: Any, val: list[dict[str, Any]]) -> dict[str, Any]:
-    preds = generate(model, tok, val, 700 if task == "judge" else 900)
+    preds = generate(model, tok, val, MAX_NEW[task], batch=4 if task == "adjudicator" else 8)
     refs = [split_prompt(e)[1] for e in val]
     if task == "judge":
         return score_judge(preds, refs, [e["meta"].get("error_type") for e in val])
+    if task == "adjudicator":
+        return score_adjudicator(preds, refs)
     return score_intake(preds, refs)
 
 
@@ -225,7 +263,7 @@ def train(task: str, model: Any, tok: Any, train_rows: list[dict[str, Any]],
     ckpt = out / task / "checkpoints"
     args = SFTConfig(
         output_dir=str(ckpt), dataset_text_field="text", max_length=max_len, packing=False,
-        per_device_train_batch_size=2, gradient_accumulation_steps=4,
+        per_device_train_batch_size=BATCH[task][0], gradient_accumulation_steps=BATCH[task][1],
         num_train_epochs=EPOCHS[task], learning_rate=2e-4, lr_scheduler_type="linear",
         warmup_ratio=0.03, weight_decay=0.01, logging_steps=10, eval_strategy="steps",
         eval_steps=50, save_strategy="steps", save_steps=50, save_total_limit=2,
@@ -285,7 +323,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--data")
     ap.add_argument("--out")
-    ap.add_argument("--tasks", nargs="+", default=list(TASKS), choices=TASKS)
+    ap.add_argument("--tasks", nargs="+", default=list(DEFAULT_TASKS), choices=TASKS)
     ap.add_argument("--eval-n", type=int, default=120, help="held-out examples scored per task")
     ap.add_argument("--max-len", type=int, default=2560)
     ap.add_argument("--skip-base-eval", action="store_true")
@@ -330,13 +368,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         va = read_jsonl(data_dir / f"{task}_val.jsonl")
         held = va[: args.eval_n]
         (out / task).mkdir(parents=True, exist_ok=True)
-        model, tok = load(args.max_len)
+        max_len = max(args.max_len, MAX_LEN.get(task, 0))
+        model, tok = load(max_len)
         if not args.skip_base_eval and not done_marker(out, task, "base_eval").exists():
             entry["base"] = evaluate(task, model, tok, held)
             done_marker(out, task, "base_eval").touch()
             log_path.write_text(json.dumps(log, indent=1))
         if not done_marker(out, task, "train").exists():
-            result = train(task, model, tok, tr, va[: args.train_eval_n], out, args.max_len)
+            result = train(task, model, tok, tr, va[: args.train_eval_n], out, max_len)
             model = result.pop("model")
             entry["train"] = result
             done_marker(out, task, "train").touch()
@@ -345,7 +384,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             from unsloth import FastLanguageModel
 
             model, tok = FastLanguageModel.from_pretrained(str(out / task / "lora"),
-                                                           max_seq_length=args.max_len,
+                                                           max_seq_length=max_len,
                                                            load_in_4bit=True)  # fmt: skip
         if not done_marker(out, task, "ft_eval").exists():
             entry["fine_tuned"] = evaluate(task, model, tok, held)

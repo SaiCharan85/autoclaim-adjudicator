@@ -155,7 +155,7 @@ on-disk LLM cache, all thresholds and model-per-role in `config/carrier_config.y
 - ☑ Step 5 — Harness core (state, nodes, edges, checkpointer, router, audit, fallback, budgets, idempotency; `docs/harness.md`)
 - ☑ Step 6 — Judge on JudgeKit (../JudgeKit, editable; CI checks out tag v0.1.0): adapter in `core/judge.py`, rubric severity tiers, insurance planted errors (`lines/auto/judge_eval.py`), `scripts/judge_eval.py` (live smoke n=1 done; pilot n=10 = 54 calls pending OK). Local judge: `ollama:autoclaim-judge` is the last fallback in the judge chain (Step 7.5)
 - ☑ Step 7 — Memory & oracle: `core/memory.py` (episodes, HNSW, cutoff 2024-07-01, read-only for evals, few-shot off until A/B), `simulator/adjuster.py` (noisy oracle), `core/review.py` + `scripts/review_queue.py` (pause/resume e2e, free)
-- ☑ Step 7.5 — Fine-tuning (docs/finetune.md): Qwen3-4B-Instruct-2507 QLoRA on Kaggle T4 (~4.3 GPU h): judge catch 30%->95%, false alarms 18%->6%; intake fields 58%->95%; both GGUF exported and on Ollama 0.35 as the last fallback of the judge/intake chains (~17-34 s/call on CPU). Distillation deferred
+- ☑ Step 7.5 — Fine-tuning (docs/finetune.md): Qwen3-4B-Instruct-2507 QLoRA on Kaggle T4 (~4.3 GPU h): judge catch 30%->95%, false alarms 18%->6%; intake fields 58%->95%; both GGUF exported and on Ollama as the last fallback of the judge/intake chains (~17-34 s/call on CPU). Adjudicator 2026-10-08 (gold targets, 650 ex, ~2.8 GPU h): outcome 85%->99.2%, wrong approvals 22.5%->0%; `ollama:autoclaim-adjudicator` last in the adjudicator chain
 - ☑ Step 8 — Evaluation: code done (`lines/auto/harness_eval.py` pre-registered metrics, ablations no_judge/no_critic, few_shot learning loop, paired bootstrap; `scripts/run_eval.py` per-arm state + resume); dev pilot done (4 arms x 50, `eval/report_dev.md`: no quality gap at n=50, judge +2.5 calls/claim, critic +1.0); locked test n=300 (`eval/report_eval.md`): auto 55.3%, auto accuracy 97.6%, 3/20 frauds auto-paid, 239/300 adjudicated by Gemma 4 (Groq quota)
   + fraud A/B: ML-only vs LLM-only vs hybrid on ~200 test claims (cached; user decision 2026-10-04)
 - ☑ Step 8.5 — Flood line on real FEMA NFIP claims (docs/flood.md): `lines/flood/` on the unchanged core; locked test agreement 98.6%, wrongly denied/paid 0.3%/0.3%, auto 41.4% ($50k authority)
@@ -175,7 +175,7 @@ reports small/base for reference; no API embeddings for now), large batch genera
 (GPU jobs must be platform-agnostic and checkpoint often so they can resume after a disconnect).
 
 **Backlog (user: "later")**: repair-cost residual tested 2026-10-04, not adopted (CI includes 0);
-older real crashes CRSS 2016–2021 for a drift study. Headroom (validation): model at ~55% of the label-noise
+drift study done (docs/drift_study.md). Headroom (validation): model at ~55% of the label-noise
 ceiling (PR-AUC 0.418 vs 0.761); vs true fraud, precision@5% = 0.675.
 
 ## 10. Explanation style

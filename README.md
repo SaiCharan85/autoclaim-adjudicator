@@ -67,8 +67,9 @@ a **flood line on real FEMA claims** plugs into the same core with no core chang
 | **Harness, locked test** | 300 test-period claims (H2 2024), run once | **55.3%** decided alone, **97.6%** of those correct (162 of 166); 4 wrong approvals: 3 of 20 true frauds paid and 1 hit-and-run trap ($15.6k paid in error, $53 per claim); 0 fail-safes; 4.4 LLM calls per claim ([report](eval/report_eval.md)) |
 | Ablations: no judge, no critic, few-shot memory (pilot) | same 50 claims, paired | no quality difference detectable at n=50 (all paired CIs include 0; every arm 100% auto-decision accuracy); the judge costs +2.5 and the critic +1.0 calls per claim ([report](eval/report_dev.md)) |
 | Judge, planted-error test (pilot) | 54 dev cases | 87.5% of planted errors caught; 2 of 10 clean cases flagged |
-| Fine-tuned local judge / intake (Qwen3-4B QLoRA) | held-out synthetic examples | judge catch rate 30% -> **95%**, false alarms 18% -> 6%; intake fields 58% -> **95%** |
+| Fine-tuned local judge / intake / adjudicator (Qwen3-4B QLoRA) | held-out synthetic examples | judge catch rate 30% -> **95%**, false alarms 18% -> 6%; intake fields 58% -> **95%**; adjudicator outcome 85% -> **99%**, wrong approvals 22.5% -> **0%** |
 | Flood line plug-in | locked test, real FEMA NFIP claims | **98.6%** agreement with FEMA's outcomes; 0.3% wrongly denied, 0.3% wrongly paid |
+| Fraud model drift across eras | real crashes 2002-2023 (GES + CRSS), simulated fraud | trained on 2002-2009, tested 11 years later: ROC-AUC 0.861 -> 0.859, no meaningful decay ([drift study](docs/drift_study.md)) |
 | Policy retrieval | 60 labeled queries | hybrid + 1-hop graph: context recall 0.889 vs 0.531 for keyword search alone |
 
 Every locked-test use is logged in [docs/test_set_log.md](docs/test_set_log.md). Read the

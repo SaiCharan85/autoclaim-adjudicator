@@ -151,3 +151,37 @@ def test_modelfile_sits_next_to_the_gguf_with_its_real_name(tmp_path: Path) -> N
 def test_cli_has_export_only_and_sampled_training_eval() -> None:
     src = SCRIPT.read_text(encoding="utf-8")
     assert "--export-only" in src and "--train-eval-n" in src
+
+
+# ---------------------------------------------------------------- adjudicator scoring
+
+
+def adj_json(outcome: str = "approve", payout: float | None = 661.91,
+             reasons: tuple[str, ...] = ("covered_loss",),
+             cited: tuple[str, ...] = ("INS-COLLISION", "LIM-DEDUCTIBLE")) -> str:  # fmt: skip
+    return json.dumps({"outcome": outcome, "payout": payout, "reasons": list(reasons),
+                       "cited_clauses": list(cited), "explanation": "x"})  # fmt: skip
+
+
+def test_score_adjudicator_perfect_model() -> None:
+    refs = [adj_json(), adj_json("deny", None, ("excluded_driver",), ("EXC-EXCLUDED-DRIVER",))]
+    m = ft.score_adjudicator(refs, refs)
+    assert m == {"n": 2, "json_valid": 1.0, "outcome_accuracy": 1.0, "reasons_exact": 1.0,
+                 "cited_recall": 1.0, "payout_match": 1.0, "wrong_approve_rate": 0.0}  # fmt: skip
+
+
+def test_score_adjudicator_wrong_approval_partial_citations_and_garbage() -> None:
+    deny = adj_json("deny", None, ("excluded_driver",), ("EXC-EXCLUDED-DRIVER", "DEF-INSURED"))
+    preds = [adj_json(cited=("INS-COLLISION",), payout=600.0), adj_json(), "no idea"]
+    refs = [adj_json(), deny, deny]
+    m = ft.score_adjudicator(preds, refs)
+    assert m["json_valid"] == pytest.approx(2 / 3) and m["outcome_accuracy"] == pytest.approx(1 / 3)
+    assert m["cited_recall"] == pytest.approx((0.5 + 0 + 0) / 3)
+    assert m["payout_match"] == 0.0  # off by more than $1
+    assert m["wrong_approve_rate"] == 0.5  # approved a claim that should be denied
+
+
+def test_adjudicator_task_settings_fit_its_long_prompts() -> None:
+    assert "adjudicator" in ft.TASKS and "adjudicator" not in ft.DEFAULT_TASKS
+    assert ft.MAX_LEN["adjudicator"] >= 3500 and ft.BATCH["adjudicator"] == (1, 8)
+    assert "num_ctx 6144" in ft.ollama_modelfile("m.gguf", "adjudicator")

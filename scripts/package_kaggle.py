@@ -4,7 +4,9 @@
   .cache/kaggle/kernel/   GPU script kernel that installs the requirements and trains
 
 Usage:
-  uv run python scripts/package_kaggle.py --user <kaggle-username>
+  uv run python scripts/package_kaggle.py --user <kaggle-username> [--tasks adjudicator]
+(a task set other than the default judge + intake gets its own kernel, so earlier runs' outputs
+stay downloadable)
 then (your account; runs as a background batch job, ~2 GPU hours on a T4):
   kaggle datasets create -p .cache/kaggle/dataset        (first time; later: datasets version)
   kaggle kernels push -p .cache/kaggle/kernel
@@ -23,7 +25,17 @@ from autoclaim.paths import REPO_ROOT, data_dir
 SLUG = "autoclaim-finetune"
 KERNEL_SLUG = f"{SLUG}-run"  # a kernel may not reuse the dataset's slug (Kaggle answers 409)
 EXPORT_SLUG = f"{SLUG}-export"  # export-only runs keep the training run's outputs intact
+TASKS = ("judge", "intake", "adjudicator")
+DEFAULT_TASKS = ("judge", "intake")
 FILES = ("intake_train.jsonl", "intake_val.jsonl", "judge_train.jsonl", "judge_val.jsonl")
+
+
+def files_for(tasks: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(f"{t}_{part}.jsonl" for t in tasks for part in ("train", "val"))
+
+
+def kernel_slug(tasks: tuple[str, ...]) -> str:
+    return KERNEL_SLUG if set(tasks) == set(DEFAULT_TASKS) else f"{SLUG}-{'-'.join(tasks)}"
 
 
 def dataset_metadata(user: str) -> dict[str, object]:
@@ -31,8 +43,10 @@ def dataset_metadata(user: str) -> dict[str, object]:
             "licenses": [{"name": "CC0-1.0"}]}  # fmt: skip
 
 
-def kernel_metadata(user: str, export_only: bool = False) -> dict[str, object]:
-    slug = EXPORT_SLUG if export_only else KERNEL_SLUG
+def kernel_metadata(
+    user: str, export_only: bool = False, tasks: tuple[str, ...] = DEFAULT_TASKS
+) -> dict[str, object]:
+    slug = EXPORT_SLUG if export_only else kernel_slug(tasks)
     return {
         "id": f"{user}/{slug}",
         "title": slug,
@@ -65,9 +79,12 @@ def main() -> int:
         choices=["intake"],
         help="upload models/finetune/out/TASK/lora; the kernel only exports it",
     )
+    ap.add_argument("--tasks", nargs="+", choices=TASKS, default=list(DEFAULT_TASKS))
     args = ap.parse_args()
+    tasks = tuple(args.tasks)
+    files = files_for(tasks)
     src = data_dir() / "finetune"
-    missing = [f for f in FILES if not (src / f).exists()]
+    missing = [f for f in files if not (src / f).exists()]
     if missing:
         print(f"missing {missing}: run scripts/build_finetune_data.py first")
         return 1
@@ -76,8 +93,9 @@ def main() -> int:
     for d in (ds, kn):
         shutil.rmtree(d, ignore_errors=True)
         d.mkdir(parents=True)
-    for f in FILES:
+    for f in files:
         shutil.copy2(src / f, ds / f)
+    (ds / "run_config.json").write_text(json.dumps({"tasks": list(tasks)}))
     for f in ("finetune_qlora.py", "requirements-finetune.txt"):
         shutil.copy2(REPO_ROOT / "kaggle" / f, ds / f)
     export = bool(args.export_only)
@@ -92,14 +110,16 @@ def main() -> int:
     shutil.copy2(REPO_ROOT / "kaggle" / entry, kn / entry)
     (ds / "dataset-metadata.json").write_text(json.dumps(dataset_metadata(args.user), indent=1))
     (kn / "kernel-metadata.json").write_text(
-        json.dumps(kernel_metadata(args.user, export), indent=1)
+        json.dumps(kernel_metadata(args.user, export, tasks), indent=1)
     )
     size = sum(p.stat().st_size for p in ds.iterdir()) / 1e6
     print(f"dataset: {ds} ({size:.1f} MB, private)\nkernel:  {kn} (GPU, internet on)")
+    slug = EXPORT_SLUG if export else kernel_slug(tasks)
     print("push with:\n"
-          f"  kaggle datasets create -p {ds}\n  kaggle kernels push -p {kn}\n"
-          f"  kaggle kernels status {args.user}/{KERNEL_SLUG}\n"
-          f"  kaggle kernels output {args.user}/{KERNEL_SLUG} -p models/finetune")  # fmt: skip
+          f"  kaggle datasets create -p {ds}   (exists already: kaggle datasets version "
+          f"-p {ds} -m <note>)\n  kaggle kernels push -p {kn}\n"
+          f"  kaggle kernels status {args.user}/{slug}\n"
+          f"  kaggle kernels output {args.user}/{slug} -p models/finetune")  # fmt: skip
     return 0
 
 

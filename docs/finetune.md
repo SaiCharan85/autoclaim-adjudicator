@@ -1,4 +1,4 @@
-# Fine-tuning (Step 7.5): local intake extractor and small judge
+# Fine-tuning: local intake extractor, small judge and adjudicator
 
 **Why:** free-tier API quotas (~40-50 claims/day) are the binding limit. Local fine-tuned models
 on Ollama become the fallback at the end of each role's model chain, so a quota-exhausted day still
@@ -16,8 +16,8 @@ processes claims at $0, and the Step 8 ablation measures base vs fine-tuned.
 - **Leakage:** training rows are from the train period, validation rows from the validation
   period, and a crash record used in training never appears in validation. The locked test period is
   refused by the builder (`autoclaim.finetune.datasets.split`). Data is built with no LLM calls.
-- **Adjudicator distillation:** deferred (user decision 2026-10-05): it needs teacher outputs on
-  real harness inputs, about 900 free-tier requests.
+- **Adjudicator:** added 2026-10-08 with gold targets instead of teacher outputs (no API calls);
+  see the adjudicator section below.
 - **Environment:** pinned in `kaggle/requirements-finetune.txt` (unsloth 2026.9.14 needs
   trl <= 0.24.0); nothing heavy is added to this project's dependencies.
 
@@ -79,3 +79,48 @@ quota, so a quota-exhausted day still processes claims at $0. On this CPU (no GP
 per call, intake ~34 s; if Ollama is not running, the call fails fast and the claim fails safe to
 a human as before. Smoke test through the project's own client: a planted omitted fact was flagged
 on exactly the right rubric item (`material_facts_addressed`), no validation retry, $0.
+
+## Adjudicator (2026-10-08)
+
+**Data (no LLM calls).** Each example is the exact production adjudicator prompt, built by the real
+line code: policy declarations, true facts, deterministic facts, retrieved clauses (the production
+retriever), fraud signals (the production fraud models) and a coverage analysis that agrees with the
+truth. Only the LLM steps before the adjudicator are replaced, by gold answers
+(`autoclaim.finetune.datasets.GoldClient`). The target is the true decision: outcome, reason codes,
+cited clauses and a templated explanation (`judge_eval.explain`, the same templates the judge data
+uses), with the deterministic payout.
+
+- 650 train-period examples, 150 validation-period; approvals 35%, the rest spread evenly over the
+  9 deny/escalate reasons (~47 each), so rare reasons are not swamped.
+- A fraud escalation is a target only when the fraud score in the prompt is at or above the review
+  threshold (0.24). True fraud with a low score looks like any other claim to the adjudicator, so
+  those claims are left out rather than teaching it to escalate at random.
+- `missing_information` escalations are left out: gold facts have nothing missing.
+
+```bash
+uv run python scripts/build_finetune_data.py --tasks adjudicator      # ~3 min, CPU
+uv run python scripts/package_kaggle.py --user <name> --tasks adjudicator  # own kernel
+```
+
+| adjudicator (120 held-out validation claims) | base Qwen3-4B | fine-tuned |
+|---|---|---|
+| outcome right (approve / deny / escalate) | 85.0% | **99.2%** |
+| reason codes exactly right | 80.0% | **97.5%** |
+| reference clauses cited (recall) | 50.2% | **100%** |
+| approvals of claims that should not be approved | 22.5% | **0%** |
+| payout right on approvals | 100% | 100% |
+| valid JSON | 100% | 100% |
+
+Training: 164 steps (2 epochs, batch 1 x 8, max length 3,584), 113.5 min at 440 tokens/s on a T4;
+final train loss 0.0034 vs best validation loss 0.0076. Whole session ~2.8 GPU h.
+
+**Caveat:** training and test prompts both come from a perfect intake and coverage step. In
+production the adjudicator reads LLM-written facts and coverage analyses, which are noisier, so
+expect lower accuracy there; the base model's 22.5% wrong-approval rate shows why a fine-tune (or a
+strong API model) matters for this role.
+
+**Local fallback.** `ollama create autoclaim-adjudicator -f Modelfile` in
+`models/finetune/adjudicator/out/adjudicator/gguf_gguf/` (q4_k_m, 2.5 GB, 6,144-token context); the
+last entry of the adjudicator chain (`ollama:autoclaim-adjudicator`, family `qwen`, so the judge
+still uses another family). Smoke test through the project client on a held-out denial: right
+outcome, reason and clause, no validation retry, 56 s on this CPU (Ollama runs it 100% on CPU).

@@ -38,3 +38,13 @@ def test_flatten_adapter_names(tmp_path: Path) -> None:
         (tmp_path / name).write_text("x")
     names = [n for _, n in pk.flatten_adapter(tmp_path, "intake")]
     assert names == ["intake_lora__adapter_config.json", "intake_lora__adapter_model.safetensors"]
+
+
+def test_other_task_sets_get_their_own_kernel_and_files() -> None:
+    assert pk.kernel_metadata("alice", tasks=("intake", "judge"))["id"] == (
+        "alice/autoclaim-finetune-run"
+    )
+    meta = pk.kernel_metadata("alice", tasks=("adjudicator",))
+    assert meta["id"] == "alice/autoclaim-finetune-adjudicator"  # earlier outputs untouched
+    assert pk.files_for(("adjudicator",)) == ("adjudicator_train.jsonl", "adjudicator_val.jsonl")
+    assert set(pk.files_for(pk.DEFAULT_TASKS)) == set(pk.FILES)
