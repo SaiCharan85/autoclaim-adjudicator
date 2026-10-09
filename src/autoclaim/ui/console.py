@@ -9,8 +9,8 @@ and stores the episode in feedback memory. No LLM call is made by anything on th
 import streamlit as st
 
 from autoclaim.core.review import pending, resume
-from autoclaim.lines.auto.build import AutoHarness, build
 from autoclaim.paths import data_dir
+from autoclaim.ui.assets import ANIMATION_CSS, BRAND, illustration
 from autoclaim.ui.review_view import (
     OUTCOMES,
     FormError,
@@ -19,15 +19,14 @@ from autoclaim.ui.review_view import (
     decision_from_form,
     queue_rows,
 )
-
-
-@st.cache_resource
-def harness() -> AutoHarness:
-    return build()  # loads the retriever and fraud models once per server
+from autoclaim.ui.shared import harness
 
 
 def main() -> None:
-    st.set_page_config(page_title="Adjuster console", layout="wide")
+    st.set_page_config(page_title="Adjuster console · autoclaim",
+                       page_icon=str(BRAND / "favicon.png"), layout="wide")  # fmt: skip
+    st.logo(str(BRAND / "logo.svg"), icon_image=str(BRAND / "favicon.svg"))
+    st.markdown(ANIMATION_CSS, unsafe_allow_html=True)
     st.title("Adjuster console")
     st.caption("Claims the harness could not decide alone. Your decision is final and is "
                "remembered as feedback for similar future claims.")  # fmt: skip
@@ -37,8 +36,10 @@ def main() -> None:
     if st.sidebar.button("Refresh"):
         st.rerun()
     if not queue:
-        st.info("No claims are waiting. Run some claims: "
-                "`uv run python scripts/run_claims.py --set dev --n 3`")  # fmt: skip
+        st.markdown(f'<div style="text-align:center;padding:24px">'
+                    f'{illustration("empty_queue", 300, "No claims waiting")}'
+                    "<h4>All caught up</h4><p>No claims are waiting for a person. Try one on the "
+                    "<b>Try a claim</b> page.</p></div>", unsafe_allow_html=True)  # fmt: skip
         return
 
     st.dataframe(queue_rows(queue), hide_index=True, use_container_width=True)

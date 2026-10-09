@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from autoclaim.datasets import bls, fema_nfip
+from autoclaim.datasets import bls, fema_nfip, nhtsa_complaints
 from autoclaim.datasets import download as dl
 from autoclaim.datasets.sources import CRSS, CRSS_YEARS, DatasetSource, UrlSource
 
@@ -156,9 +156,10 @@ def test_main_defaults_to_all_sources(
 
     monkeypatch.setattr(bls, "download_cpi", fake("bls"))
     monkeypatch.setattr(fema_nfip, "download", fake("fema"))
+    monkeypatch.setattr(nhtsa_complaints, "download", fake("nhtsa"))
     assert dl.main([], api_factory=FakeKaggleApi) == 0
     out = capsys.readouterr().out
-    assert "[toy]" in out and sorted(fetched) == ["bls", "fema"]
+    assert "[toy]" in out and sorted(fetched) == ["bls", "fema", "nhtsa"]
 
 
 def test_main_rejects_unknown_source() -> None:

@@ -89,9 +89,22 @@ uv run pytest                                           # no network, no keys ne
 ## Demo
 
 ```bash
-uv run python scripts/run_claims.py --set dev --n 3     # a few claims through the harness (~4.5 free LLM calls each)
-uv run streamlit run src/autoclaim/ui/console.py        # adjuster console: review what was escalated
+uv run python scripts/download_data.py nhtsa_complaints  # 500+ real crash stories (public domain, ~1 min)
+uv run streamlit run src/autoclaim/ui/console.py         # opens http://127.0.0.1:8501 (this machine only)
 ```
+
+**Try a claim** (sidebar page): pick a real crash story from NHTSA's public complaint database,
+written by vehicle owners, or write your own; adjust the policy, car and repair estimate; and run it
+through the full harness. The page shows the verdict (approved and how much, denied, or sent to an
+adjuster), a step-by-step trace (story read, driver checked, coverage matched, fraud screened,
+payout worked out, decision double-checked, routed), the letter to the policyholder and the audit
+trail. The story is used word for word; the form holds what an insurer already knows. Each run is
+about 4-6 free-tier LLM calls, cached, so the same story and form never run twice.
+
+**Adjuster console** (main page): claims the harness sent to a person.
+
+Demo damage photos (optional, free Unsplash key in `.env`): `uv run python scripts/fetch_demo_images.py`.
+Every icon, illustration, animation and photo, and where it comes from: [ASSETS.md](ASSETS.md).
 
 The console lists claims the harness could not decide alone, with why each was escalated, the
 proposed decision (outcome, payout, cited clauses, explanation), the deterministic numbers, fraud

@@ -24,6 +24,7 @@ from autoclaim.paths import raw_dir
 MANIFEST_NAME = "manifest.json"
 BLS_KEY = "bls_cpi"  # BLS price indexes (datasets/bls.py), fetched from the public API
 FEMA_KEY = "fema_nfip"  # FEMA NFIP flood claims (datasets/fema_nfip.py), OpenFEMA API
+NHTSA_KEY = "nhtsa_complaints"  # real crash stories for the try-a-claim page (nhtsa_complaints.py)
 KAGGLE_METADATA_NAME = "dataset-metadata.json"
 
 
@@ -219,7 +220,7 @@ def main(
     api_factory: Callable[[], KaggleApiLike] = default_api,
     fetch: Fetcher = default_fetch,
 ) -> int:
-    known = [*SOURCES, *URL_SOURCES, BLS_KEY, FEMA_KEY]
+    known = [*SOURCES, *URL_SOURCES, BLS_KEY, FEMA_KEY, NHTSA_KEY]
     parser = argparse.ArgumentParser(description="Download datasets into data/raw/.")
     # no argparse `choices`: it rejects list defaults with nargs="*"
     parser.add_argument("sources", nargs="*", help=f"default: all ({', '.join(known)})")
@@ -239,6 +240,12 @@ def main(
 
             path = fema_nfip.download(raw_dir(key))
             print(f"[{key}] downloaded: {path.name} | {fema_nfip.LICENSE}")
+            continue
+        if key == NHTSA_KEY:
+            from autoclaim.datasets import nhtsa_complaints
+
+            path = nhtsa_complaints.download(raw_dir(key))
+            print(f"[{key}] downloaded: {path.name} | {nhtsa_complaints.LICENSE}")
             continue
         if key == BLS_KEY:
             from autoclaim.datasets import bls

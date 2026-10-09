@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 200" width="420" height="200" role="img" aria-label="A crash story becomes a decision in three steps">
+  <title>From crash story to decision</title>
+  <rect x="0" y="0" width="420" height="200" rx="20" fill="#eef2ff"/>
+  <!-- road -->
+  <path d="M0 158 H420" stroke="#1e3a8a" stroke-width="22" opacity="0.12"/>
+  <path d="M14 158 H44 M74 158 H104 M134 158 H164 M194 158 H224 M254 158 H284 M314 158 H344 M374 158 H404" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  <!-- step 1: the car and its story -->
+  <g>
+    <path d="M30 140 L40 120 C42 116 46 114 50 114 H86 C90 114 94 116 96 120 L106 140" fill="#2563eb"/>
+    <rect x="24" y="138" width="88" height="20" rx="6" fill="#2563eb"/>
+    <path d="M44 120 H90 L97 136 H38 Z" fill="#93c5fd"/>
+    <circle cx="44" cy="158" r="9" fill="#1f2937"/><circle cx="44" cy="158" r="3.5" fill="#e5e7eb"/>
+    <circle cx="92" cy="158" r="9" fill="#1f2937"/><circle cx="92" cy="158" r="3.5" fill="#e5e7eb"/>
+    <!-- speech bubble -->
+    <rect x="40" y="40" width="80" height="50" rx="12" fill="#ffffff" stroke="#93c5fd" stroke-width="2"/>
+    <path d="M62 90 L58 104 L76 90" fill="#ffffff" stroke="#93c5fd" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M54 56 H106 M54 66 H98 M54 76 H88" stroke="#2563eb" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+  </g>
+  <!-- arrow -->
+  <path d="M138 72 H168" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7"/>
+  <path d="M166 64 L176 72 L166 80" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- step 2: policy check with magnifier -->
+  <g>
+    <rect x="186" y="30" width="62" height="80" rx="8" fill="#ffffff" stroke="#93c5fd" stroke-width="2"/>
+    <path d="M198 48 H236 M198 58 H230 M198 68 H234 M198 78 H222" stroke="#93c5fd" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="240" cy="96" r="15" fill="#ffffff" stroke="#1e3a8a" stroke-width="4"/>
+    <path d="M251 107 L262 118" stroke="#1e3a8a" stroke-width="6" stroke-linecap="round"/>
+    <path d="M234 96 L238.5 100.5 L246 92" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- arrow -->
+  <path d="M276 72 H306" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7"/>
+  <path d="M304 64 L314 72 L304 80" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- step 3: the decision -->
+  <g>
+    <path d="M362 26 L392 37 V60 C392 81 380 94 362 101 C344 94 332 81 332 60 V37 Z" fill="#1e3a8a"/>
+    <path d="M348 62 L358 72 L377 51" fill="none" stroke="#10b981" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M348 62 L358 72 L377 51" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="334" y="112" width="56" height="18" rx="9" fill="#10b981"/>
+    <path d="M346 121 H378" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <path d="M150 28 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z" fill="#f59e0b"/>
+  <circle cx="300" cy="118" r="4" fill="#93c5fd"/>
+</svg>
