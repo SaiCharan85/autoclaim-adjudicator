@@ -1,6 +1,6 @@
 """Try a claim: story -> claim details -> decision, on a real crash story or your own text.
 
-Run:  uv run streamlit run src/autoclaim/ui/console.py   (this page is in the sidebar)
+Run:  uv run streamlit run src/autoclaim/ui/app.py   (Auto section in the sidebar)
 Stories: uv run python scripts/download_data.py nhtsa_complaints
 Demo photos (optional): uv run python scripts/fetch_demo_images.py
 
@@ -21,6 +21,7 @@ from autoclaim.paths import data_dir, raw_dir
 from autoclaim.ui.assets import (
     ANIMATION_CSS,
     BRAND,
+    PAGE_CSS,
     credit_html,
     demo_photos,
     deny_mark,
@@ -59,52 +60,6 @@ COVERAGES = {
     "Liability only (no own-car cover)": "liability_only",
 }
 STEP_ICON = {"ok": "circle-check", "warn": "triangle-alert", "bad": "circle-x"}
-CSS = """
-<style>
-.block-container {padding-top: 1.4rem; max-width: 1180px;}
-.hero {background: linear-gradient(120deg,#1e3a8a,#2563eb 60%,#3b82f6); color: #fff;
-       border-radius: 16px; padding: 22px 28px; margin-bottom: 14px; display: flex; gap: 18px;
-       align-items: center;}
-.hero h1 {margin: 0; font-size: 1.9rem; color: #fff;}
-.hero p {margin: 6px 0 0; opacity: .9;}
-.badge {background: rgba(255,255,255,.16); border-radius: 14px; padding: 12px; display: flex;}
-.stepper {display: flex; gap: 10px; margin: 4px 0 18px;}
-.stp {flex: 1; display: flex; gap: 10px; align-items: center; background: #fff;
-      border-radius: 12px; padding: 10px 14px; color: #6b7280;
-      box-shadow: 0 1px 2px rgba(0,0,0,.05);}
-.stp .n {flex: 0 0 28px; height: 28px; border-radius: 50%; background: #e5e7eb; color: #6b7280;
-         display: flex; align-items: center; justify-content: center; font-weight: 700;}
-.stp.active {color: #1e3a8a; outline: 2px solid #2563eb;}
-.stp.active .n {background: #2563eb; color: #fff;}
-.stp.done {color: #047857;} .stp.done .n {background: #10b981; color: #fff;}
-.sec {font-size: 1.15rem; font-weight: 700; color: #1f2937; margin: 6px 0 8px;}
-.story {background: #fff; border-left: 5px solid #2563eb; border-radius: 12px;
-        padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); font-size: 1.02rem;
-        line-height: 1.55;}
-.chips {margin: 10px 0 4px;}
-.chip {display: inline-flex; gap: 6px; align-items: center; background: #eef2ff; color: #1e3a8a;
-       border-radius: 999px; padding: 4px 11px; margin: 0 6px 6px 0; font-size: .85rem;}
-.photo {background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06);}
-.photo img {width: 100%; height: 210px; object-fit: cover; border-radius: 8px; display: block;}
-.photo .credit {font-size: .78rem; color: #6b7280; padding: 6px 4px 0;}
-.verdict {border-radius: 16px; padding: 18px 24px; margin: 8px 0 16px; color: #fff;
-          display: flex; gap: 16px; align-items: center;}
-.verdict h2 {margin: 0; color: #fff; font-size: 1.6rem;}
-.verdict p {margin: 4px 0 0; opacity: .92;}
-.tone-ok {background: linear-gradient(120deg,#047857,#10b981);}
-.tone-bad {background: linear-gradient(120deg,#b91c1c,#ef4444);}
-.tone-warn {background: linear-gradient(120deg,#b45309,#f59e0b);}
-.step {display: flex; gap: 14px; align-items: flex-start; background: #fff; border-radius: 12px;
-       padding: 12px 16px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,.05);}
-.dot {flex: 0 0 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center;}
-.dot-ok {background: #10b981;} .dot-warn {background: #f59e0b;} .dot-bad {background: #ef4444;}
-.step b {display: block;} .step span {color: #4b5563; font-size: .93rem;}
-.card {background: #fff; border-radius: 14px; padding: 18px 22px; color: #374151;
-       box-shadow: 0 1px 2px rgba(0,0,0,.05);}
-.center {text-align: center;}
-</style>
-"""
 
 
 def names(text: str) -> list[str]:
@@ -128,7 +83,7 @@ def section(name: str, title: str, color: str = "currentColor") -> None:
 st.set_page_config(page_title="Try a claim · autoclaim", page_icon=str(BRAND / "favicon.png"),
                    layout="wide")  # fmt: skip
 st.logo(str(BRAND / "logo.svg"), icon_image=str(BRAND / "favicon.svg"))
-show(CSS + ANIMATION_CSS)
+show(PAGE_CSS + ANIMATION_CSS)
 show(f'<div class="hero"><div class="badge">{icon("car", 34, "#ffffff")}</div><div>'
      "<h1>Try a claim</h1><p>Start with the story: a real crash from NHTSA's public complaint "
      "database (owners' own words) or your own. Then confirm the claim details and see how the "

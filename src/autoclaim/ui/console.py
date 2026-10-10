@@ -1,6 +1,6 @@
 """Adjuster console: review claims the harness escalated and resume them with a decision.
 
-Run:  uv run streamlit run src/autoclaim/ui/console.py
+Run:  uv run streamlit run src/autoclaim/ui/app.py   (Auto section: Adjuster console)
 
 Submitting a decision resumes the paused claim (finalized exactly once, even if submitted twice)
 and stores the episode in feedback memory. No LLM call is made by anything on this page.

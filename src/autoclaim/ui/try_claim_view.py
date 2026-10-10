@@ -434,9 +434,10 @@ def found_and_missing(d: StoryDetails) -> tuple[list[str], list[str]]:
 
 # ---------------------------------------------------------------- autofill status per field
 
-Source = Literal["record", "story", "estimated", "sample", "needed"]
+Source = Literal["record", "fema", "story", "estimated", "sample", "needed"]
 SOURCE_TAG = {
     "record": ":green[● from the NHTSA record]",
+    "fema": ":green[● from the FEMA record]",
     "story": ":green[● from the story]",
     "estimated": ":blue[● estimated, check it]",
     "sample": ":gray[● sample policy]",

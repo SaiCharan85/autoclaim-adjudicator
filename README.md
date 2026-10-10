@@ -91,7 +91,7 @@ uv run pytest                                           # no network, no keys ne
 
 ```bash
 uv run python scripts/download_data.py nhtsa_complaints  # 500+ real crash stories (public domain, ~1 min)
-uv run streamlit run src/autoclaim/ui/console.py         # opens http://127.0.0.1:8501 (this machine only)
+uv run streamlit run src/autoclaim/ui/app.py             # Auto + Flood sections, http://127.0.0.1:8501 (this machine only)
 ```
 
 **Try a claim** (sidebar page): pick a real crash story from NHTSA's public complaint database,
@@ -101,6 +101,8 @@ adjuster), a step-by-step trace (story read, driver checked, coverage matched, f
 payout worked out, decision double-checked, routed), the letter to the policyholder and the audit
 trail. The story is used word for word; the form holds what an insurer already knows. Each run is
 about 4-6 free-tier LLM calls, cached, so the same story and form never run twice.
+
+**Flood claim** (sidebar page): a home flood claim (NFIP-style building and contents coverage) run through the flood line on the same core harness; decided by code, no model calls.
 
 **Adjuster console** (main page): claims the harness sent to a person.
 

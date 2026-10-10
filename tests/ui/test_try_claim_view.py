@@ -11,7 +11,7 @@ from autoclaim.lines.auto.claim import ClaimPackage
 from autoclaim.ui import try_claim_view as tv
 
 STORY = "I was stopped at a red light when the car behind me failed to stop and hit my bumper."
-PAGE = Path(__file__).resolve().parents[2] / "src" / "autoclaim" / "ui" / "pages" / "try_a_claim.py"
+PAGE = Path(__file__).resolve().parents[2] / "src" / "autoclaim" / "ui" / "views" / "try_a_claim.py"
 TODAY = date(2026, 10, 8)
 
 

@@ -18,7 +18,7 @@ How to run this day to day on free quotas. Commands assume `uv run` from the rep
 ```bash
 python scripts/run_claims.py --set dev --n 3 --dry-run   # what it would spend
 python scripts/run_claims.py --set dev --n 3             # run (cached: re-runs are free)
-streamlit run src/autoclaim/ui/console.py                # answer the escalated ones
+streamlit run src/autoclaim/ui/app.py                    # Auto (claims + adjuster console) and Flood
 python scripts/review_queue.py --list                    # or list them in the terminal
 ```
 
