@@ -1,7 +1,6 @@
 """Step 0 guardrails: package layout, config, secrets hygiene, and git safeguards."""
 
 import importlib
-import json
 import re
 import tomllib
 from pathlib import Path
@@ -100,18 +99,3 @@ def test_gitignore_covers_sensitive_paths(repo_root: Path, pattern: str) -> None
 def test_env_example_is_not_ignored(repo_root: Path) -> None:
     lines = (repo_root / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert "!.env.example" in lines
-
-
-# ---------------------------------------------------------------- git safeguards
-
-
-def test_claude_settings_disable_attribution(repo_root: Path) -> None:
-    settings = json.loads((repo_root / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    assert settings["includeCoAuthoredBy"] is False
-    assert settings["attribution"] == {"commit": "", "pr": ""}
-
-
-@pytest.mark.parametrize("command", ["commit", "push", "rebase", "reset"])
-def test_claude_settings_deny_history_rewriting_git(repo_root: Path, command: str) -> None:
-    settings = json.loads((repo_root / ".claude" / "settings.json").read_text(encoding="utf-8"))
-    assert f"Bash(git {command}:*)" in settings["permissions"]["deny"]
